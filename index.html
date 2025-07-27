@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏆 Solana Leaderboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-10 px-4">
+  <h1 class="text-4xl font-bold mb-4 text-yellow-400">🔥 Solana Leaderboard</h1>
+  <p class="mb-6 text-sm text-gray-400">Stand: <span id="last-updated">...</span></p>
+  <div class="w-full max-w-5xl overflow-x-auto">
+    <table class="min-w-full bg-gray-800 shadow-md rounded-lg overflow-hidden">
+      <thead class="bg-yellow-600 text-left">
+        <tr>
+          <th class="px-4 py-2">#</th>
+          <th class="px-4 py-2">Username</th>
+          <th class="px-4 py-2">Wallet</th>
+          <th class="px-4 py-2 text-right">SOL</th>
+          <th class="px-4 py-2 text-right">Tokens</th>
+          <th class="px-4 py-2 text-right">Total (SOL)</th>
+          <th class="px-4 py-2 text-right">% Change</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-body"></tbody>
+    </table>
+  </div>
+  <script>
+    function updateLeaderboard() {
+      fetch("data/leaderboard.json")
+        .then(res => res.json())
+        .then(json => {
+          const tbody = document.getElementById("leaderboard-body");
+          const updated = document.getElementById("last-updated");
+          updated.textContent = new Date(json.updated).toLocaleString();
+          tbody.innerHTML = "";
+
+          json.data.forEach((entry, i) => {
+            const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
+            const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+
+            const row = document.createElement("tr");
+            row.className = i % 2 === 0 ? "bg-gray-700" : "bg-gray-800";
+            row.innerHTML = `
+              <td class="px-4 py-2">${i + 1}</td>
+              <td class="px-4 py-2">${entry.username}</td>
+              <td class="px-4 py-2 text-xs text-gray-300">${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}</td>
+              <td class="px-4 py-2 text-right">${entry.sol.toFixed(4)}</td>
+              <td class="px-4 py-2 text-right text-green-400">${entry.tokens.toFixed(4)}</td>
+              <td class="px-4 py-2 text-right font-bold text-yellow-400">${entry.total.toFixed(4)}</td>
+              <td class="px-4 py-2 text-right font-mono ${changeColor}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
+            `;
+            tbody.appendChild(row);
+          });
+        })
+        .catch(err => {
+          document.getElementById("last-updated").textContent = "Fehler beim Laden!";
+          console.error("Fehler beim Laden der JSON-Datei:", err);
+        });
+    }
+    updateLeaderboard();
+    setInterval(updateLeaderboard, 30000);
+  </script>
+</body>
+</html>
