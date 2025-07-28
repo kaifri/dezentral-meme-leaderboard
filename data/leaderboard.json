@@ -1,13 +1,29 @@
 {
-  "updated": "2025-07-28T20:55:12.116104+00:00",
+  "updated": "2025-07-28T21:12:08.603588+00:00",
   "data": [
     {
       "username": "LaVleR",
       "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
       "sol": 0.2331,
-      "tokens": 0.7283,
-      "total": 0.9614,
-      "change_pct": 97.5
+      "tokens": 0.7266,
+      "total": 0.9597,
+      "change_pct": 97.15
+    },
+    {
+      "username": "Umut",
+      "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
+      "sol": 0.4197,
+      "tokens": 0.2074,
+      "total": 0.6271,
+      "change_pct": 25.42
+    },
+    {
+      "username": "Wozzelsepp",
+      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
+      "sol": 0.0647,
+      "tokens": 0.4765,
+      "total": 0.5412,
+      "change_pct": 8.25
     },
     {
       "username": "hir0",
@@ -21,17 +37,9 @@
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.4462,
-      "total": 0.4886,
-      "change_pct": -3.34
-    },
-    {
-      "username": "Umut",
-      "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
-      "sol": 0.4197,
-      "tokens": 0,
-      "total": 0.4197,
-      "change_pct": -16.06
+      "tokens": 0.4452,
+      "total": 0.4876,
+      "change_pct": -3.55
     },
     {
       "username": "Moge G",
@@ -42,28 +50,20 @@
       "change_pct": -71.46
     },
     {
-      "username": "Wozzelsepp",
-      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
-      "sol": 0.1385,
-      "tokens": 0,
-      "total": 0.1385,
-      "change_pct": -72.3
-    },
-    {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
       "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
       "sol": 0.0204,
-      "tokens": 0.0803,
-      "total": 0.1007,
-      "change_pct": -79.85
+      "tokens": 0.0503,
+      "total": 0.0707,
+      "change_pct": -85.86
     },
     {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.0034,
-      "tokens": 0.014,
-      "total": 0.0174,
-      "change_pct": -96.52
+      "tokens": 0.0088,
+      "total": 0.0122,
+      "change_pct": -97.56
     }
   ],
   "winner_pot": {
