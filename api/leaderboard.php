@@ -77,8 +77,55 @@ function getSolBalance($wallet) {
     return 0;
 }
 
-// Get token balances
+// Get token balances with RPC primary, Helius fallback
 function getTokenBalances($wallet) {
+    // Try Solana RPC first (more complete)
+    $tokens = getTokenBalancesRPC($wallet);
+    
+    // If RPC fails, fallback to Helius
+    if (empty($tokens)) {
+        logWalletActivity($wallet, "RPC returned no tokens, trying Helius fallback");
+        $tokens = getTokenBalancesHelius($wallet);
+    }
+    
+    return $tokens;
+}
+
+function getTokenBalancesRPC($wallet) {
+    $data = [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'getTokenAccountsByOwner',
+        'params' => [$wallet, ['programId' => 'TokenkegQfeZyiNwAJbNbGzvdTTUvMMyyNV34PUAE7z']]
+    ];
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => 'Content-Type: application/json',
+            'content' => json_encode($data)
+        ]
+    ]);
+    
+    $response = file_get_contents('https://api.mainnet-beta.solana.com', false, $context);
+    $result = json_decode($response, true);
+    
+    $tokens = [];
+    if (isset($result['result']['value']) && is_array($result['result']['value'])) {
+        foreach ($result['result']['value'] as $account) {
+            $tokenAmount = $account['account']['data']['parsed']['info']['tokenAmount'] ?? null;
+            if ($tokenAmount) {
+                $mint = $account['account']['data']['parsed']['info']['mint'];
+                $amount = $tokenAmount['uiAmount'] ?? 0;
+                $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
+            }
+        }
+    }
+    
+    return $tokens;
+}
+
+function getTokenBalancesHelius($wallet) {
     global $HELIUS_API_KEY;
     
     $url = "https://api.helius.xyz/v0/addresses/{$wallet}/balances?api-key={$HELIUS_API_KEY}";
