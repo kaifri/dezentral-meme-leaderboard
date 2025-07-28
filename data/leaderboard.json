@@ -1,5 +1,5 @@
 {
-  "updated": "2025-07-28T07:54:13.976090+00:00Z",
+  "updated": "2025-07-28T08:08:53.758753+00:00",
   "data": [
     {
       "username": "rAmonZrdpxx",
@@ -13,9 +13,9 @@
       "username": "Wozzelsepp",
       "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
       "sol": 0.2898,
-      "tokens": 0.1923,
-      "total": 0.4821,
-      "change_pct": -3.59
+      "tokens": 0.2132,
+      "total": 0.503,
+      "change_pct": 0.6
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
@@ -37,9 +37,15 @@
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.074,
-      "tokens": 0.2831,
-      "total": 0.3571,
-      "change_pct": -28.59
+      "tokens": 0.2866,
+      "total": 0.3606,
+      "change_pct": -27.88
     }
-  ]
+  ],
+  "winner_pot": {
+    "wallet": "HuoAiJTK2qYQ7jgVDK7X9T1NBDV7nFzQQzwfvs4MtoKN",
+    "balance": 2.5
+  },
+  "challenge_ended": false,
+  "challenge_end_date": "2025-08-04T00:00:00+00:00"
 }
