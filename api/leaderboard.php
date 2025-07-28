@@ -336,71 +336,6 @@ function updateLeaderboard() {
     
     date_default_timezone_set('Europe/Berlin');
     
-    // Parallel processing mit cURL multi
-    $multiHandle = curl_multi_init();
-    $curlHandles = [];
-    
-    // Prepare all RPC calls at once
-    foreach ($wallets as $entry) {
-        $wallet = $entry['wallet'];
-        
-        // SOL balance call
-        $solHandle = curl_init();
-        curl_setopt($solHandle, CURLOPT_URL, 'https://api.mainnet-beta.solana.com');
-        curl_setopt($solHandle, CURLOPT_POST, true);
-        curl_setopt($solHandle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($solHandle, CURLOPT_TIMEOUT, 10);
-        curl_setopt($solHandle, CURLOPT_POSTFIELDS, json_encode([
-            'jsonrpc' => '2.0',
-            'id' => "sol_{$wallet}",
-            'method' => 'getBalance',
-            'params' => [$wallet]
-        ]));
-        curl_setopt($solHandle, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        
-        curl_multi_add_handle($multiHandle, $solHandle);
-        $curlHandles["sol_{$wallet}"] = $solHandle;
-        
-        // Token balance call
-        $tokenHandle = curl_init();
-        curl_setopt($tokenHandle, CURLOPT_URL, 'https://api.mainnet-beta.solana.com');
-        curl_setopt($tokenHandle, CURLOPT_POST, true);
-        curl_setopt($tokenHandle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($tokenHandle, CURLOPT_TIMEOUT, 10);
-        curl_setopt($tokenHandle, CURLOPT_POSTFIELDS, json_encode([
-            'jsonrpc' => '2.0',
-            'id' => "tokens_{$wallet}",
-            'method' => 'getTokenAccountsByOwner',
-            'params' => [
-                $wallet,
-                ['programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'],
-                ['encoding' => 'jsonParsed']
-            ]
-        ]));
-        curl_setopt($tokenHandle, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        
-        curl_multi_add_handle($multiHandle, $tokenHandle);
-        $curlHandles["tokens_{$wallet}"] = $tokenHandle;
-    }
-    
-    // Execute all calls in parallel
-    do {
-        $status = curl_multi_exec($multiHandle, $active);
-        if ($active) {
-            curl_multi_select($multiHandle);
-        }
-    } while ($active && $status == CURLM_OK);
-    
-    // Process results
-    $results = [];
-    foreach ($curlHandles as $key => $handle) {
-        $results[$key] = curl_multi_getcontent($handle);
-        curl_multi_remove_handle($multiHandle, $handle);
-        curl_close($handle);
-    }
-    curl_multi_close($multiHandle);
-    
-    // Now process the results quickly
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
     
@@ -408,29 +343,13 @@ function updateLeaderboard() {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
         
-        // Get SOL balance from parallel result
-        $solData = json_decode($results["sol_{$wallet}"] ?? '{}', true);
-        $sol = isset($solData['result']['value']) ? $solData['result']['value'] / 1000000000 : 0;
+        // Get SOL balance
+        $sol = getSolBalance($wallet);
         
-        // Get token balances from parallel result
-        $tokenData = json_decode($results["tokens_{$wallet}"] ?? '{}', true);
-        $tokens = [];
+        // Get token balances
+        $tokens = getTokenBalances($wallet);
         
-        if (isset($tokenData['result']['value'])) {
-            foreach ($tokenData['result']['value'] as $account) {
-                if (isset($account['account']['data']['parsed']['info'])) {
-                    $accountData = $account['account']['data']['parsed']['info'];
-                    $mint = $accountData['mint'] ?? '';
-                    $amount = floatval($accountData['tokenAmount']['uiAmount'] ?? 0);
-                    
-                    if ($mint && $amount > 0) {
-                        $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
-                    }
-                }
-            }
-        }
-        
-        // Calculate token value (this part is still sequential but faster)
+        // Calculate token value
         $tokenValue = 0;
         foreach ($tokens as $mint => $amount) {
             $tokenPriceUsd = getTokenPrice($mint);
@@ -453,7 +372,7 @@ function updateLeaderboard() {
         ];
     }
     
-    // Sort and return result
+    // Sort leaderboard
     usort($leaderboard, function($a, $b) {
         return $b['total'] <=> $a['total'];
     });
@@ -467,7 +386,7 @@ function updateLeaderboard() {
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
     
     $result = [
-        'updated' => date('Y-m-d H:i:s'),
+        'updated' => date('Y-m-d H:i:s'), // German time
         'data' => $leaderboard,
         'winner_pot' => [
             'wallet' => $WINNER_POT_WALLET,
