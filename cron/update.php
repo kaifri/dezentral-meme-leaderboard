@@ -50,6 +50,10 @@ file_put_contents($lockFile, date('Y-m-d H:i:s'));
 try {
     logMessage("Starting leaderboard update...", 'INFO');
     
+    // Debug: Log the configured end date before processing
+    $configuredEndDate = $config['app']['challenge_end_date'] ?? 'NOT SET';
+    logMessage("DEBUG - Configured challenge_end_date from config: {$configuredEndDate}", 'DEBUG');
+    
     // Measure execution time
     $startTime = microtime(true);
     
@@ -67,7 +71,10 @@ try {
         logMessage("✅ Update successful: {$walletCount} wallets processed in {$executionTime}ms, Challenge: {$challengeStatus}", 'SUCCESS');
         
         if (isset($data['debug'])) {
-            logMessage("Debug - End Date: {$data['debug']['end_date_parsed']}, Current: {$data['debug']['current_time']}", 'DEBUG');
+            logMessage("Debug - Raw End Date from config: {$data['debug']['raw_end_date']}", 'DEBUG');
+            logMessage("Debug - Parsed End Date: {$data['debug']['end_date_parsed']}", 'DEBUG');
+            logMessage("Debug - Current Time: {$data['debug']['current_time']}", 'DEBUG');
+            logMessage("Debug - Challenge Ended: " . ($data['challenge_ended'] ? 'YES' : 'NO'), 'DEBUG');
         }
         
         // Log some stats
