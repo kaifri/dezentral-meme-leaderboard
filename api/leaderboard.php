@@ -194,6 +194,25 @@ function updateLeaderboard() {
         return $b['total'] <=> $a['total'];
     });
     
+    // Badge-Logik
+    $mostActiveTrader = 0;
+    $volumeKing = 0;
+    
+    foreach ($leaderboard as $entry) {
+        if ($entry['swap_count'] > $mostActiveTrader) {
+            $mostActiveTrader = $entry['swap_count'];
+        }
+        if ($entry['swap_volume'] > $volumeKing) {
+            $volumeKing = $entry['swap_volume'];
+        }
+    }
+    
+    // Badges zuweisen
+    foreach ($leaderboard as &$entry) {
+        $entry['most_active_trader'] = ($entry['swap_count'] == $mostActiveTrader && $mostActiveTrader > 0);
+        $entry['volume_king'] = ($entry['swap_volume'] == $volumeKing && $volumeKing > 0);
+    }
+    
     $outputData = [
         'updated' => date('c'),
         'data' => $leaderboard,
@@ -215,6 +234,24 @@ function updateLeaderboard() {
     file_put_contents($DATA_FILE, json_encode($outputData, JSON_PRETTY_PRINT));
     
     return $outputData;
+}
+
+// Get Swap History
+function getSwapHistory($wallet, $startDate) {
+    global $HELIUS_API_KEY;
+    
+    $url = "https://api.helius.xyz/v0/addresses/{$wallet}/transactions?api-key={$HELIUS_API_KEY}";
+    // Filter für DEX-Transaktionen seit Challenge-Start
+    
+    // Parse Swap-Daten von Jupiter, Raydium, Orca etc.
+    return [
+        'total_volume_sol' => 0,
+        'swap_count' => 0,
+        'avg_trade_size' => 0,
+        'unique_tokens' => 0,
+        'best_token_gain' => 0,
+        'total_swap_pnl' => 0
+    ];
 }
 
 // Handle request

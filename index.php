@@ -84,6 +84,9 @@ $frontend_config = [
           <th class="px-6 py-4 text-right font-bold text-yellow-900">Tokens</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">Total (SOL)</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">% Change</th>
+          <th class="px-6 py-4 text-right font-bold text-yellow-900">Swaps</th>
+          <th class="px-6 py-4 text-right font-bold text-yellow-900">Vol. (SOL)</th>
+          <th class="px-6 py-4 text-right font-bold text-yellow-900">Avg Trade</th>
         </tr>
       </thead>
       <tbody id="leaderboard-body"></tbody>
@@ -159,31 +162,55 @@ $frontend_config = [
         cardClass = "bg-gradient-to-r from-orange-900 to-orange-800 border-l-4 border-orange-400 rounded-lg p-4 shadow-lg";
       }
 
+      // Badges für spezielle Achievements
+      let badges = '';
+      if (entry.most_active_trader) {
+        badges += '<span class="inline-block bg-blue-600 text-blue-100 text-xs px-2 py-1 rounded-full mr-1 mb-1">🔥 Most Active</span>';
+      }
+      if (entry.volume_king) {
+        badges += '<span class="inline-block bg-purple-600 text-purple-100 text-xs px-2 py-1 rounded-full mr-1 mb-1">👑 Volume King</span>';
+      }
+
       return `
         <div class="${cardClass}">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center space-x-3">
               <span class="text-2xl font-bold">${rankDisplay}</span>
               <div>
-                <div class="font-semibold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-white' : 'text-gray-200'}">${entry.username}</div>
-                <a href="https://solscan.io/account/${entry.wallet}" target="_blank" class="text-xs text-gray-400 hover:text-blue-400 transition-colors">
-                  ${entry.wallet.slice(0, 8)}...${entry.wallet.slice(-6)}
+                <div class="font-semibold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-white' : 'text-gray-200'}">${entry.username || 'Unknown'}</div>
+                <a href="https://solscan.io/account/${entry.wallet || ''}" target="_blank" class="text-xs text-gray-400 hover:text-blue-400 transition-colors">
+                  ${entry.wallet ? `${entry.wallet.slice(0, 8)}...${entry.wallet.slice(-6)}` : 'N/A'}
                 </a>
               </div>
             </div>
             <div class="text-right">
-              <div class="font-bold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-yellow-400' : 'text-yellow-400'}">${entry.total.toFixed(4)} SOL</div>
-              <div class="text-xs ${changeColor} font-mono">${changeText} ${entry.change_pct.toFixed(2)}%</div>
+              <div class="font-bold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-yellow-400' : 'text-yellow-400'}">${(entry.total || 0).toFixed(4)} SOL</div>
+              <div class="text-xs ${changeColor} font-mono">${changeText} ${(entry.change_pct || 0).toFixed(2)}%</div>
             </div>
           </div>
+          ${badges ? `<div class="mb-2">${badges}</div>` : ''}
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span class="text-gray-400">SOL:</span>
-              <span class="font-mono ml-1">${entry.sol.toFixed(4)}</span>
+              <span class="font-mono ml-1">${(entry.sol || 0).toFixed(4)}</span>
             </div>
             <div>
               <span class="text-gray-400">Tokens:</span>
-              <span class="font-mono ml-1 text-green-400">${entry.tokens.toFixed(4)}</span>
+              <span class="font-mono ml-1 text-green-400">${(entry.tokens || 0).toFixed(4)}</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs mt-2">
+            <div>
+              <span class="text-gray-400">Swaps:</span>
+              <span class="font-mono ml-1">${entry.swap_count != null ? entry.swap_count : 0}</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Volume:</span>
+              <span class="font-mono ml-1 text-blue-400">${entry.swap_volume != null ? entry.swap_volume.toFixed(2) : '0.00'}</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Avg:</span>
+              <span class="font-mono ml-1">${entry.avg_trade != null ? entry.avg_trade.toFixed(3) : '0.000'}</span>
             </div>
           </div>
         </div>
@@ -248,27 +275,28 @@ $frontend_config = [
           }
 
           // Update winner pot with clickable wallet
-          if (json.winner_pot) {
+          if (json.winner_pot && json.winner_pot.wallet) {
             winnerPot.classList.remove("hidden");
-            potBalance.textContent = json.winner_pot.balance;
-            potWallet.textContent = `${json.winner_pot.wallet.slice(0, 4)}...${json.winner_pot.wallet.slice(-4)}`;
-            potWalletLink.href = `https://solscan.io/account/${json.winner_pot.wallet}`;
+            potBalance.textContent = json.winner_pot.balance || '0';
+            const potWalletAddr = json.winner_pot.wallet;
+            potWallet.textContent = potWalletAddr ? `${potWalletAddr.slice(0, 4)}...${potWalletAddr.slice(-4)}` : 'N/A';
+            potWalletLink.href = `https://solscan.io/account/${potWalletAddr || ''}`;
           }
 
           // Show winner announcement if challenge ended
-          if (json.challenge_ended && json.data.length > 0) {
+          if (json.challenge_ended && json.data && json.data.length > 0) {
             const winner = json.data[0];
             winnerAnnouncement.classList.remove("hidden");
-            winnerName.textContent = winner.username;
-            winnerTotal.textContent = winner.total.toFixed(4);
-            winnerChange.textContent = winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2);
+            winnerName.textContent = winner.username || 'Unknown';
+            winnerTotal.textContent = winner.total ? winner.total.toFixed(4) : '0.0000';
+            winnerChange.textContent = winner.change_pct ? (winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2)) : '0.00';
           }
 
           // Generate both desktop table and mobile cards
           json.data.forEach((entry, i) => {
             const rank = i + 1;
-            const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
-            const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+            const changeColor = (entry.change_pct || 0) > 0 ? 'text-green-400' : ((entry.change_pct || 0) < 0 ? 'text-red-400' : 'text-gray-300');
+            const changeText = (entry.change_pct || 0) > 0 ? '▲' : ((entry.change_pct || 0) < 0 ? '▼' : '–');
             
             // Desktop table row
             let rowClass = "hover:bg-gray-700 transition-colors";
@@ -285,20 +313,35 @@ $frontend_config = [
               rowClass += i % 2 === 0 ? " bg-gray-800" : " bg-gray-700";
             }
 
+            // Badges für Desktop
+            let badgeHtml = '';
+            if (entry.most_active_trader) {
+              badgeHtml += '<span class="inline-block bg-blue-600 text-blue-100 text-xs px-2 py-1 rounded-full mr-1">🔥 Most Active</span>';
+            }
+            if (entry.volume_king) {
+              badgeHtml += '<span class="inline-block bg-purple-600 text-purple-100 text-xs px-2 py-1 rounded-full mr-1">👑 Volume King</span>';
+            }
+
             const row = document.createElement("tr");
             row.className = rowClass;
             row.innerHTML = `
               <td class="px-6 py-4 font-bold text-lg ${rank <= 3 ? 'text-2xl' : ''}">${rankDisplay}</td>
-              <td class="px-6 py-4 ${rank === 1 ? 'font-bold text-yellow-200 text-lg' : rank <= 3 ? 'font-semibold' : ''}">${entry.username}</td>
+              <td class="px-6 py-4 ${rank === 1 ? 'font-bold text-yellow-200 text-lg' : rank <= 3 ? 'font-semibold' : ''}">
+                <div>${entry.username || 'Unknown'}</div>
+                ${badgeHtml ? `<div class="mt-1">${badgeHtml}</div>` : ''}
+              </td>
               <td class="px-6 py-4 text-sm text-gray-300">
-                <a href="https://solscan.io/account/${entry.wallet}" target="_blank" class="hover:text-blue-400 transition-colors">
-                  ${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}
+                <a href="https://solscan.io/account/${entry.wallet || ''}" target="_blank" class="hover:text-blue-400 transition-colors">
+                  ${entry.wallet ? `${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}` : 'N/A'}
                 </a>
               </td>
-              <td class="px-6 py-4 text-right font-mono">${entry.sol.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right text-green-400 font-mono">${entry.tokens.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${entry.total.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
+              <td class="px-6 py-4 text-right font-mono">${(entry.sol || 0).toFixed(4)}</td>
+              <td class="px-6 py-4 text-right text-green-400 font-mono">${(entry.tokens || 0).toFixed(4)}</td>
+              <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${(entry.total || 0).toFixed(4)}</td>
+              <td class="px-6 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${(entry.change_pct || 0).toFixed(2)}%</td>
+              <td class="px-6 py-4 text-right font-mono">${entry.swap_count != null ? entry.swap_count : 0}</td>
+              <td class="px-6 py-4 text-right font-mono">${entry.swap_volume != null ? entry.swap_volume.toFixed(2) : '0.00'}</td>
+              <td class="px-6 py-4 text-right font-mono">${entry.avg_trade != null ? entry.avg_trade.toFixed(3) : '0.000'}</td>
             `;
             tbody.appendChild(row);
 
