@@ -82,20 +82,55 @@ function getTokenBalances($wallet) {
     global $HELIUS_API_KEY;
     
     $url = "https://api.helius.xyz/v0/addresses/{$wallet}/balances?api-key={$HELIUS_API_KEY}";
+    
+    // Log the API call
+    error_log("Fetching token balances for wallet: {$wallet}");
+    error_log("Helius URL: {$url}");
+    
     $response = file_get_contents($url);
+    
+    if ($response === false) {
+        error_log("Failed to fetch token balances from Helius for wallet: {$wallet}");
+        return [];
+    }
+    
     $data = json_decode($response, true);
+    
+    // Log the raw response for debugging
+    error_log("Helius response for {$wallet}: " . substr($response, 0, 500) . "...");
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("JSON decode error for wallet {$wallet}: " . json_last_error_msg());
+        return [];
+    }
     
     $tokens = [];
     if (isset($data['tokens']) && is_array($data['tokens'])) {
+        error_log("Found " . count($data['tokens']) . " raw tokens for wallet: {$wallet}");
+        
         foreach ($data['tokens'] as $token) {
             $mint = $token['mint'];
-            $amount = floatval($token['amount']) / pow(10, intval($token['decimals']));
+            $rawAmount = $token['amount'];
+            $decimals = intval($token['decimals']);
+            $amount = floatval($rawAmount) / pow(10, $decimals);
+            
+            error_log("Token {$mint}: raw={$rawAmount}, decimals={$decimals}, calculated={$amount}");
+            
             if ($amount > 0) {
                 $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
+                error_log("Added token {$mint} with amount {$amount}");
+            } else {
+                error_log("Skipped token {$mint} - zero amount");
             }
+        }
+    } else {
+        error_log("No tokens array found in response for wallet: {$wallet}");
+        if (isset($data['error'])) {
+            error_log("Helius API error: " . json_encode($data['error']));
         }
     }
     
+    error_log("Final token count for {$wallet}: " . count($tokens));
     return $tokens;
 }
 
