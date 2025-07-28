@@ -23,6 +23,8 @@ jobs:
           pip install requests python-dotenv
 
       - name: Run Python script
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
         run: python update.py
 
       - name: Commit and push
