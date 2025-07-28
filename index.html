@@ -113,24 +113,6 @@
       }
     }
 
-    function updatePodium(data) {
-      if (data.length >= 3) {
-        document.getElementById('podium').classList.remove('hidden');
-        
-        // First place
-        document.getElementById('first-username').textContent = data[0].username;
-        document.getElementById('first-total').textContent = `${data[0].total.toFixed(4)} SOL`;
-        
-        // Second place
-        document.getElementById('second-username').textContent = data[1].username;
-        document.getElementById('second-total').textContent = `${data[1].total.toFixed(4)} SOL`;
-        
-        // Third place
-        document.getElementById('third-username').textContent = data[2].username;
-        document.getElementById('third-total').textContent = `${data[2].total.toFixed(4)} SOL`;
-      }
-    }
-
     function updateLeaderboard() {
       fetch("data/leaderboard.json")
         .then(res => res.json())
@@ -152,10 +134,8 @@
 
           // Update "updated x minutes ago"
           updated.textContent = getTimeAgo(json.updated);
+          updated.dataset.lastUpdate = json.updated;
           tbody.innerHTML = "";
-
-          // Update podium
-          updatePodium(json.data);
 
           // Update challenge status
           challengeStatus.classList.remove("hidden");
@@ -211,7 +191,7 @@
             } else if (rank === 3) {
               rowClass = "bg-gradient-to-r from-orange-900 to-orange-800 border-l-4 border-orange-400";
             } else {
-              rowClass += i % 2 === 0 ? " bg-gray-800" : " bg-gray-750";
+              rowClass += i % 2 === 0 ? " bg-gray-800" : " bg-gray-700";
             }
 
             const row = document.createElement("tr");
