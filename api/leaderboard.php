@@ -83,7 +83,29 @@ function getTokenBalances($wallet) {
 }
 
 // Get token price from Dexscreener
-function getTokenPrice($mint) {
+function getTokenPrice($mint, $preventRecursion = false) {
+    // Special case for SOL to prevent recursion
+    if ($mint === "So11111111111111111111111111111111111111112" && !$preventRecursion) {
+        logMessage("SOL token detected, using direct USD price lookup", 'DEBUG');
+        // Get SOL price directly from Jupiter without recursion
+        $jupiterUrl = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC";
+        $jupResponse = @file_get_contents($jupiterUrl);
+        
+        if ($jupResponse !== false) {
+            $jupData = json_decode($jupResponse, true);
+            if (isset($jupData['data'][$mint]['price'])) {
+                $price = floatval($jupData['data'][$mint]['price']);
+                if ($price > 0) {
+                    return $price; // Return USD price for SOL
+                }
+            }
+        }
+        
+        // If Jupiter fails, use a hardcoded fallback price
+        logMessage("Failed to get SOL price from Jupiter, using fallback", 'WARNING');
+        return 30.0; // Fallback SOL price in USD
+    }
+    
     logMessage("Getting price for token: " . substr($mint, 0, 12) . "...", 'DEBUG');
     
     // First check if there's a manual override
@@ -202,11 +224,15 @@ function getSolPriceUsd() {
     if ($response !== false) {
         $data = json_decode($response, true);
         $price = floatval($data['data']['So11111111111111111111111111111111111111112']['price'] ?? 0);
-        if ($price > 0) return $price;
+        if ($price > 0) {
+            logMessage("Got SOL price from Jupiter: $" . $price, 'DEBUG');
+            return $price;
+        }
     }
     
-    // Fallback to Dexscreener
-    return getTokenPrice("So11111111111111111111111111111111111111112");
+    // New fallback - don't use getTokenPrice to avoid recursion
+    logMessage("Jupiter failed for SOL price, using hardcoded fallback", 'WARNING');
+    return 30.0; // Fallback SOL price (you should update this regularly)
 }
 
 // Get Swap History
