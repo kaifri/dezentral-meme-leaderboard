@@ -1,13 +1,45 @@
 {
-  "updated": "2025-07-28T00:39:20.870310+00:00Z",
+  "updated": "2025-07-28T06:18:11.444671+00:00Z",
   "data": [
+    {
+      "username": "rAmonZrdpxx",
+      "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
+      "sol": 0.5055,
+      "tokens": 0.0,
+      "total": 0.5055,
+      "change_pct": 1.09
+    },
+    {
+      "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
+      "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
+      "sol": 0.0769,
+      "tokens": 0.4238,
+      "total": 0.5007,
+      "change_pct": 0.14
+    },
+    {
+      "username": "hir0",
+      "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
+      "sol": 0.49,
+      "tokens": 0,
+      "total": 0.49,
+      "change_pct": -2.0
+    },
+    {
+      "username": "Wozzelsepp",
+      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
+      "sol": 0.3939,
+      "tokens": 0.0853,
+      "total": 0.4792,
+      "change_pct": -4.17
+    },
     {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.074,
-      "tokens": 0.7309,
-      "total": 0.8049,
-      "change_pct": 60.98
+      "tokens": 0.2961,
+      "total": 0.3701,
+      "change_pct": -25.98
     }
   ]
 }
