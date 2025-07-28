@@ -138,6 +138,36 @@ function getSolPriceUsd() {
     return getTokenPrice("So11111111111111111111111111111111111111112");
 }
 
+// Get token price from Jupiter
+function getTokenPriceJupiter($mint) {
+    $url = "https://api.jup.ag/v4/price?ids={$mint}&vsToken=USDC";
+    $response = @file_get_contents($url);
+    
+    if ($response !== false) {
+        $data = json_decode($response, true);
+        $price = floatval($data['data'][$mint]['price'] ?? 0);
+        if ($price > 0) return $price;
+    }
+    
+    return 0;
+}
+
+// Log wallet activity to a file
+function logWalletActivity($wallet, $message) {
+    $logDir = __DIR__ . '/../logs';
+    
+    // Create logs directory if it doesn't exist
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    
+    $logFile = $logDir . '/' . $wallet . '.log';
+    $timestamp = date('Y-m-d H:i:s');
+    $logEntry = "[{$timestamp}] {$message}" . PHP_EOL;
+    
+    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+}
+
 // Update leaderboard data
 function updateLeaderboard() {
     global $CONFIG_FILE, $START_SOL_FILE, $DATA_FILE, $WINNER_POT_WALLET, $CHALLENGE_END_DATE;
@@ -146,8 +176,8 @@ function updateLeaderboard() {
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
-    // Check if challenge ended - FIX: Use DateTime for proper UTC parsing
-    $endDateTime = new DateTime($CHALLENGE_END_DATE);  // This properly handles ISO 8601 format
+    // Check if challenge ended - FIX: Ensure both times are in UTC
+    $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
     $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
     $challengeEnded = $nowDateTime >= $endDateTime;
     
@@ -156,6 +186,7 @@ function updateLeaderboard() {
     error_log("Parsed End DateTime: " . $endDateTime->format('Y-m-d H:i:s T'));
     error_log("Current DateTime: " . $nowDateTime->format('Y-m-d H:i:s T'));
     error_log("Challenge Ended: " . ($challengeEnded ? 'YES' : 'NO'));
+    error_log("Time difference (seconds): " . ($endDateTime->getTimestamp() - $nowDateTime->getTimestamp()));
     
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
@@ -167,19 +198,36 @@ function updateLeaderboard() {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
         
+        // Log wallet processing start
+        logWalletActivity($wallet, "=== PROCESSING WALLET: {$username} ===");
+        
         if (!isset($startSols[$wallet])) {
+            logWalletActivity($wallet, "ERROR: No start SOL balance found, skipping wallet");
             continue;
         }
         
         $sol = getSolBalance($wallet);
+        logWalletActivity($wallet, "SOL balance: {$sol}");
+        
         $tokenValue = 0;
         
         if (!$challengeEnded) {
             $tokens = getTokenBalances($wallet);
+            logWalletActivity($wallet, "Found " . count($tokens) . " tokens");
+            
             foreach ($tokens as $mint => $amount) {
+                logWalletActivity($wallet, "Processing token {$mint} with amount {$amount}");
+                
                 $tokenPriceUsd = getTokenPrice($mint);
+                logWalletActivity($wallet, "Token {$mint} price: {$tokenPriceUsd} USD");
+                
                 if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
-                    $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
+                    $tokenValueSol = $amount * ($tokenPriceUsd / $solPriceUsd);
+                    $tokenValue += $tokenValueSol;
+                    logWalletActivity($wallet, "Added {$tokenValueSol} SOL value from token {$mint}");
+                } else {
+                    $reason = $tokenPriceUsd <= 0 ? "no price found" : "SOL price unavailable";
+                    logWalletActivity($wallet, "Skipped token {$mint} - {$reason}");
                 }
             }
         } else {
@@ -189,15 +237,21 @@ function updateLeaderboard() {
                 foreach ($lastData['data'] as $lastEntry) {
                     if ($lastEntry['wallet'] === $wallet) {
                         $tokenValue = $lastEntry['tokens'];
+                        logWalletActivity($wallet, "Using frozen token value: {$tokenValue} SOL");
                         break;
                     }
                 }
+            } else {
+                logWalletActivity($wallet, "No previous data found for frozen token values");
             }
         }
         
         $total = $sol + $tokenValue;
         $start = $startSols[$wallet];
         $changePct = $start > 0 ? (($total - $start) / $start * 100) : 0;
+        
+        logWalletActivity($wallet, "SUMMARY: SOL={$sol}, Tokens={$tokenValue}, Total={$total}, Change={$changePct}%");
+        logWalletActivity($wallet, "=== END PROCESSING ===\n");
         
         $leaderboard[] = [
             'username' => $username,
