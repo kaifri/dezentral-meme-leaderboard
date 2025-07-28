@@ -1,10 +1,19 @@
 <?php
+// Disable error display to prevent HTML output in JSON responses
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 // Only set headers and handle HTTP requests if running via web server
 if (isset($_SERVER['REQUEST_METHOD'])) {
     header('Content-Type: application/json');
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    
+    // Clean output buffer to prevent any stray output
+    if (ob_get_level()) {
+        ob_clean();
+    }
 }
 
 // Load secure configuration only if not already defined
@@ -22,16 +31,16 @@ if (!defined('CONFIG_ACCESS')) {
         exit;
     }
     
-    // Extract configuration values with fallbacks
-    $HELIUS_API_KEY = $config['api']['helius_api_key'] ?? '';
-    $WINNER_POT_WALLET = $config['api']['winner_pot_wallet'] ?? '';
-    $CHALLENGE_END_DATE = $config['app']['challenge_end_date'] ?? '';
-    $CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'] ?? 30;
+    // Extract configuration values with fallbacks - only if not already set
+    if (!isset($HELIUS_API_KEY)) $HELIUS_API_KEY = $config['api']['helius_api_key'] ?? '';
+    if (!isset($WINNER_POT_WALLET)) $WINNER_POT_WALLET = $config['api']['winner_pot_wallet'] ?? '';
+    if (!isset($CHALLENGE_END_DATE)) $CHALLENGE_END_DATE = $config['app']['challenge_end_date'] ?? '';
+    if (!isset($CACHE_TIMEOUT)) $CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'] ?? 30;
     
-    // File paths
-    $CONFIG_FILE = __DIR__ . '/../config/wallets.json';
-    $START_SOL_FILE = __DIR__ . '/../data/start_sol_balances.json';
-    $DATA_FILE = __DIR__ . '/../data/leaderboard.json';
+    // File paths - only if not already set
+    if (!isset($CONFIG_FILE)) $CONFIG_FILE = __DIR__ . '/../config/wallets.json';
+    if (!isset($START_SOL_FILE)) $START_SOL_FILE = __DIR__ . '/../data/start_sol_balances.json';
+    if (!isset($DATA_FILE)) $DATA_FILE = __DIR__ . '/../data/leaderboard.json';
 }
 
 // Authentication function
@@ -93,7 +102,7 @@ function getTokenBalances($wallet) {
 
 function getTokenBalancesRPC($wallet) {
     // Add delay to prevent rate limiting
-    usleep(100000); // 100ms delay between RPC calls
+    usleep(200000); // Increase to 200ms delay between RPC calls
     
     $data = [
         'jsonrpc' => '2.0',
@@ -101,8 +110,8 @@ function getTokenBalancesRPC($wallet) {
         'method' => 'getTokenAccountsByOwner',
         'params' => [
             $wallet, 
-            ['programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'], // CORRECT program ID
-            ['encoding' => 'jsonParsed'] // Add this for parsed response
+            ['programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'],
+            ['encoding' => 'jsonParsed']
         ]
     ];
     
@@ -110,13 +119,15 @@ function getTokenBalancesRPC($wallet) {
         'http' => [
             'method' => 'POST',
             'header' => 'Content-Type: application/json',
-            'content' => json_encode($data)
+            'content' => json_encode($data),
+            'timeout' => 10 // Add timeout
         ]
     ]);
     
     logWalletActivity($wallet, "Fetching token balances from Solana RPC");
     
-    $response = file_get_contents('https://api.mainnet-beta.solana.com', false, $context);
+    // Use @ to suppress warnings that break JSON output
+    $response = @file_get_contents('https://api.mainnet-beta.solana.com', false, $context);
     
     if ($response === false) {
         logWalletActivity($wallet, "ERROR: Failed to fetch from Solana RPC");
@@ -135,14 +146,17 @@ function getTokenBalancesRPC($wallet) {
         logWalletActivity($wallet, "Found " . count($result['result']['value']) . " token accounts from RPC");
         
         foreach ($result['result']['value'] as $account) {
+            if (!isset($account['account']['data']['parsed']['info'])) {
+                continue;
+            }
+            
             $accountData = $account['account']['data']['parsed']['info'];
-            $mint = $accountData['mint'];
-            $tokenAmount = $accountData['tokenAmount'];
+            $mint = $accountData['mint'] ?? '';
+            $tokenAmount = $accountData['tokenAmount'] ?? [];
             $amount = floatval($tokenAmount['uiAmount'] ?? 0);
             
-            logWalletActivity($wallet, "RPC Token {$mint}: amount={$amount}");
-            
-            if ($amount > 0) {
+            if ($mint && $amount > 0) {
+                logWalletActivity($wallet, "RPC Token {$mint}: amount={$amount}");
                 $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
                 logWalletActivity($wallet, "Added RPC token {$mint} with amount {$amount}");
             }
@@ -163,54 +177,44 @@ function getTokenBalancesHelius($wallet) {
     
     $url = "https://api.helius.xyz/v0/addresses/{$wallet}/balances?api-key={$HELIUS_API_KEY}";
     
-    // Log the API call
-    error_log("Fetching token balances for wallet: {$wallet}");
-    error_log("Helius URL: {$url}");
+    logWalletActivity($wallet, "Fetching token balances from Helius API");
     
-    $response = file_get_contents($url);
+    // Use @ to suppress warnings
+    $response = @file_get_contents($url);
     
     if ($response === false) {
-        error_log("Failed to fetch token balances from Helius for wallet: {$wallet}");
+        logWalletActivity($wallet, "ERROR: Failed to fetch from Helius API");
         return [];
     }
     
     $data = json_decode($response, true);
     
-    // Log the raw response for debugging
-    error_log("Helius response for {$wallet}: " . substr($response, 0, 500) . "...");
-    
     if (json_last_error() !== JSON_ERROR_NONE) {
-        error_log("JSON decode error for wallet {$wallet}: " . json_last_error_msg());
+        logWalletActivity($wallet, "JSON decode error: " . json_last_error_msg());
         return [];
     }
     
     $tokens = [];
     if (isset($data['tokens']) && is_array($data['tokens'])) {
-        error_log("Found " . count($data['tokens']) . " raw tokens for wallet: {$wallet}");
+        logWalletActivity($wallet, "Found " . count($data['tokens']) . " raw tokens from Helius");
         
         foreach ($data['tokens'] as $token) {
-            $mint = $token['mint'];
-            $rawAmount = $token['amount'];
-            $decimals = intval($token['decimals']);
+            $mint = $token['mint'] ?? '';
+            $rawAmount = $token['amount'] ?? 0;
+            $decimals = intval($token['decimals'] ?? 0);
             $amount = floatval($rawAmount) / pow(10, $decimals);
             
-            error_log("Token {$mint}: raw={$rawAmount}, decimals={$decimals}, calculated={$amount}");
-            
-            if ($amount > 0) {
+            if ($mint && $amount > 0) {
+                logWalletActivity($wallet, "Helius Token {$mint}: amount={$amount}");
                 $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
-                error_log("Added token {$mint} with amount {$amount}");
-            } else {
-                error_log("Skipped token {$mint} - zero amount");
+                logWalletActivity($wallet, "Added Helius token {$mint} with amount {$amount}");
             }
         }
     } else {
-        error_log("No tokens array found in response for wallet: {$wallet}");
-        if (isset($data['error'])) {
-            error_log("Helius API error: " . json_encode($data['error']));
-        }
+        logWalletActivity($wallet, "No tokens array found in Helius response");
     }
     
-    error_log("Final token count for {$wallet}: " . count($tokens));
+    logWalletActivity($wallet, "Final Helius token count: " . count($tokens));
     return $tokens;
 }
 
@@ -401,28 +405,41 @@ function updateLeaderboard() {
 
 // Only handle HTTP requests if running via web server
 if (isset($_SERVER['REQUEST_METHOD'])) {
-    // Handle request
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Return cached data if exists and is recent
-        if (file_exists($DATA_FILE)) {
-            $fileTime = filemtime($DATA_FILE);
-            if (time() - $fileTime < $CACHE_TIMEOUT) {
-                echo file_get_contents($DATA_FILE);
-                exit;
+    try {
+        // Handle request
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            // Return cached data if exists and is recent
+            if (file_exists($DATA_FILE)) {
+                $fileTime = filemtime($DATA_FILE);
+                if (time() - $fileTime < $CACHE_TIMEOUT) {
+                    $cachedData = file_get_contents($DATA_FILE);
+                    if ($cachedData !== false) {
+                        echo $cachedData;
+                        exit;
+                    }
+                }
             }
+            
+            // Update and return new data
+            $data = updateLeaderboard();
+            echo json_encode($data);
+            
+        } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            // Keep auth for manual updates via POST
+            checkAuth();
+            
+            // Manual update
+            $data = updateLeaderboard();
+            echo json_encode(['message' => 'Update successful', 'data' => $data]);
         }
-        
-        // Update and return new data
-        $data = updateLeaderboard();
-        echo json_encode($data);
-        
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Keep auth for manual updates via POST
-        checkAuth();
-        
-        // Manual update
-        $data = updateLeaderboard();
-        echo json_encode(['message' => 'Update successful', 'data' => $data]);
+    } catch (Exception $e) {
+        error_log("API Error: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['error' => 'Internal server error']);
+    } catch (Error $e) {
+        error_log("API Fatal Error: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 ?>
