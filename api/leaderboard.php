@@ -302,6 +302,9 @@ function updateLeaderboard() {
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
+    // Set German timezone for timestamp
+    date_default_timezone_set('Europe/Berlin');
+    
     // Check if challenge ended
     $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
     $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
@@ -387,7 +390,7 @@ function updateLeaderboard() {
     });
     
     $result = [
-        'updated' => date('Y-m-d H:i:s'),
+        'updated' => date('Y-m-d H:i:s'), // Now in German time (CET/CEST)
         'data' => $leaderboard,
         'winner_pot' => [
             'wallet' => $WINNER_POT_WALLET,
