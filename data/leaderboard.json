@@ -1,5 +1,5 @@
 {
-  "updated": "2025-07-28T09:50:13.689369+00:00",
+  "updated": "2025-07-28T09:58:47.491549+00:00",
   "data": [
     {
       "username": "Umut",
@@ -7,9 +7,7 @@
       "sol": 0.5718,
       "tokens": 0.0,
       "total": 0.5718,
-      "change_pct": 14.35,
-      "sol_deposits": 0.0,
-      "has_deposits": false
+      "change_pct": 14.35
     },
     {
       "username": "rAmonZrdpxx",
@@ -17,19 +15,23 @@
       "sol": 0.5055,
       "tokens": 0.0,
       "total": 0.5055,
-      "change_pct": -0.01,
-      "sol_deposits": 0.9087,
-      "has_deposits": true
+      "change_pct": -0.01
+    },
+    {
+      "username": "Moge G",
+      "wallet": "2r6rkq4Vkyj3o2LsCmYGTdxKNFerhpQCWHFvaxY4x7KE",
+      "sol": 0.4999,
+      "tokens": 0,
+      "total": 0.4999,
+      "change_pct": 0.01
     },
     {
       "username": "Wozzelsepp",
       "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
       "sol": 0.2898,
-      "tokens": 0.2111,
-      "total": 0.5009,
-      "change_pct": 0.18,
-      "sol_deposits": 0.0,
-      "has_deposits": false
+      "tokens": 0.2054,
+      "total": 0.4952,
+      "change_pct": -0.96
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
@@ -37,9 +39,7 @@
       "sol": 0.4431,
       "tokens": 0,
       "total": 0.4431,
-      "change_pct": -11.39,
-      "sol_deposits": 0.5,
-      "has_deposits": true
+      "change_pct": -11.39
     },
     {
       "username": "hir0",
@@ -47,19 +47,15 @@
       "sol": 0.3834,
       "tokens": 0,
       "total": 0.3834,
-      "change_pct": -23.33,
-      "sol_deposits": 3.019,
-      "has_deposits": true
+      "change_pct": -23.33
     },
     {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.074,
-      "tokens": 0.3004,
-      "total": 0.3744,
-      "change_pct": -25.12,
-      "sol_deposits": 1.0173,
-      "has_deposits": true
+      "tokens": 0.2846,
+      "total": 0.3586,
+      "change_pct": -28.27
     }
   ],
   "winner_pot": {
