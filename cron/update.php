@@ -3,17 +3,16 @@
 // Cron job script - runs every 30 seconds
 // Enhanced version with proper error handling and logging
 
+// Add these at the top for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Load secure configuration
 define('CONFIG_ACCESS', true);
 $config = require_once __DIR__ . '/../config/config.php';
 
-require_once __DIR__ . '/../api/leaderboard.php';
-
-// Set timezone
-date_default_timezone_set('Europe/Berlin');
-
-// Enhanced logging function
-function logMessage($message, $level = 'INFO') {
+// Rename this function to avoid conflict with leaderboard.php
+function cronLogMessage($message, $level = 'INFO') {
     $timestamp = date('Y-m-d H:i:s');
     $logFile = __DIR__ . '/../logs/cron.log';
     
@@ -30,17 +29,26 @@ function logMessage($message, $level = 'INFO') {
     echo $logEntry;
 }
 
+// Test logging immediately
+cronLogMessage("Update script started", 'INFO');
+
+// Include leaderboard.php after defining our function
+require_once __DIR__ . '/../api/leaderboard.php';
+
+// Set timezone
+date_default_timezone_set('Europe/Berlin');
+
 // Check if update is already running (prevent overlapping)
 $lockFile = __DIR__ . '/../data/update.lock';
 if (file_exists($lockFile)) {
     $lockTime = filemtime($lockFile);
     if (time() - $lockTime < 60) { // Lock expires after 60 seconds
-        logMessage("Update already running, skipping...", 'WARNING');
+        cronLogMessage("Update already running, skipping...", 'WARNING');
         exit;
     } else {
         // Remove stale lock file
         unlink($lockFile);
-        logMessage("Removed stale lock file", 'INFO');
+        cronLogMessage("Removed stale lock file", 'INFO');
     }
 }
 
@@ -48,11 +56,11 @@ if (file_exists($lockFile)) {
 file_put_contents($lockFile, date('Y-m-d H:i:s'));
 
 try {
-    logMessage("Starting leaderboard update...", 'INFO');
+    cronLogMessage("Starting leaderboard update...", 'INFO');
     
     // Debug: Log the configured end date before processing
     $configuredEndDate = $config['app']['challenge_end_date'] ?? 'NOT SET';
-    logMessage("DEBUG - Configured challenge_end_date from config: {$configuredEndDate}", 'DEBUG');
+    cronLogMessage("DEBUG - Configured challenge_end_date from config: {$configuredEndDate}", 'DEBUG');
     
     // Make config globally available for leaderboard.php
     $GLOBALS['config'] = $config;
@@ -71,32 +79,32 @@ try {
         $challengeStatus = $data['challenge_ended'] ? 'ENDED' : 'ACTIVE';
         
         // Enhanced logging with debug info
-        logMessage("✅ Update successful: {$walletCount} wallets processed in {$executionTime}ms, Challenge: {$challengeStatus}", 'SUCCESS');
+        cronLogMessage("✅ Update successful: {$walletCount} wallets processed in {$executionTime}ms, Challenge: {$challengeStatus}", 'SUCCESS');
         
         if (isset($data['debug'])) {
-            logMessage("Debug - Raw End Date from config: {$data['debug']['raw_end_date']}", 'DEBUG');
-            logMessage("Debug - Parsed End Date: {$data['debug']['end_date_parsed']}", 'DEBUG');
-            logMessage("Debug - Current Time: {$data['debug']['current_time']}", 'DEBUG');
-            logMessage("Debug - Challenge Ended: " . ($data['challenge_ended'] ? 'YES' : 'NO'), 'DEBUG');
+            cronLogMessage("Debug - Raw End Date from config: {$data['debug']['raw_end_date']}", 'DEBUG');
+            cronLogMessage("Debug - Parsed End Date: {$data['debug']['end_date_parsed']}", 'DEBUG');
+            cronLogMessage("Debug - Current Time: {$data['debug']['current_time']}", 'DEBUG');
+            cronLogMessage("Debug - Challenge Ended: " . ($data['challenge_ended'] ? 'YES' : 'NO'), 'DEBUG');
         }
         
         // Log some stats
         if (!empty($data['data'])) {
             $leader = $data['data'][0];
-            logMessage("Current leader: {$leader['username']} with {$leader['total']} SOL ({$leader['change_pct']}%)", 'INFO');
+            cronLogMessage("Current leader: {$leader['username']} with {$leader['total']} SOL ({$leader['change_pct']}%)", 'INFO');
         }
         
     } else {
-        logMessage("❌ Update failed - updateLeaderboard() returned null/false", 'ERROR');
+        cronLogMessage("❌ Update failed - updateLeaderboard() returned null/false", 'ERROR');
     }
     
 } catch (Exception $e) {
-    logMessage("❌ Update failed with exception: " . $e->getMessage(), 'ERROR');
-    logMessage("Stack trace: " . $e->getTraceAsString(), 'DEBUG');
+    cronLogMessage("❌ Update failed with exception: " . $e->getMessage(), 'ERROR');
+    cronLogMessage("Stack trace: " . $e->getTraceAsString(), 'DEBUG');
     
 } catch (Error $e) {
-    logMessage("❌ Update failed with fatal error: " . $e->getMessage(), 'FATAL');
-    logMessage("Stack trace: " . $e->getTraceAsString(), 'DEBUG');
+    cronLogMessage("❌ Update failed with fatal error: " . $e->getMessage(), 'FATAL');
+    cronLogMessage("Stack trace: " . $e->getTraceAsString(), 'DEBUG');
     
 } finally {
     // Always remove lock file
@@ -112,9 +120,9 @@ if (file_exists($logFile) && filesize($logFile) > 1024 * 1024) { // > 1MB
     if (count($lines) > 1000) {
         $keepLines = array_slice($lines, -1000);
         file_put_contents($logFile, implode('', $keepLines));
-        logMessage("Log file rotated, kept last 1000 entries", 'INFO');
+        cronLogMessage("Log file rotated, kept last 1000 entries", 'INFO');
     }
 }
 
-logMessage("Update cycle completed\n" . str_repeat('-', 50), 'INFO');
+cronLogMessage("Update cycle completed\n" . str_repeat('-', 50), 'INFO');
 ?>
