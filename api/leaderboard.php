@@ -10,7 +10,6 @@ define('CONFIG_ACCESS', true);
 $config = require_once __DIR__ . '/../config/config.php';
 
 // Extract configuration values
-$API_TOKEN = $config['api']['token'];
 $HELIUS_API_KEY = $config['api']['helius_api_key'];
 $WINNER_POT_WALLET = $config['api']['winner_pot_wallet'];
 $CHALLENGE_END_DATE = $config['app']['challenge_end_date'];
@@ -20,26 +19,6 @@ $CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'];
 $CONFIG_FILE = __DIR__ . '/../config/wallets.json';
 $START_SOL_FILE = __DIR__ . '/../data/start_sol_balances.json';
 $DATA_FILE = __DIR__ . '/../data/leaderboard.json';
-
-// Auth check
-function checkAuth() {
-    global $API_TOKEN;
-    $headers = getallheaders();
-    $auth_header = isset($headers['Authorization']) ? $headers['Authorization'] : '';
-    
-    if (!$auth_header || !str_starts_with($auth_header, 'Bearer ')) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Missing or invalid authorization header']);
-        exit;
-    }
-    
-    $token = substr($auth_header, 7);
-    if ($token !== $API_TOKEN) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Invalid token']);
-        exit;
-    }
-}
 
 // Get SOL balance
 function getSolBalance($wallet) {
@@ -226,7 +205,7 @@ function updateLeaderboard() {
 
 // Handle request
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    checkAuth();
+    // No auth required anymore
     
     // Return cached data if exists and is recent
     if (file_exists($DATA_FILE)) {
@@ -242,6 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode($data);
     
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Keep auth for manual updates via POST
     checkAuth();
     
     // Manual update
@@ -251,5 +231,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 } else {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
+}
+
+// Auth check function (only used for POST requests now)
+function checkAuth() {
+    global $config;
+    $API_TOKEN = $config['api']['token'];
+    
+    $headers = getallheaders();
+    $auth_header = isset($headers['Authorization']) ? $headers['Authorization'] : '';
+    
+    if (!$auth_header || !str_starts_with($auth_header, 'Bearer ')) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Missing or invalid authorization header']);
+        exit;
+    }
+    
+    $token = substr($auth_header, 7);
+    if ($token !== $API_TOKEN) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Invalid token']);
+        exit;
+    }
 }
 ?>

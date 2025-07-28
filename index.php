@@ -104,15 +104,15 @@ $frontend_config = [
   </div>
 
   <script>
-    // Configuration injected server-side (secure - no external config files needed)
-    const CONFIG = <?php echo json_encode($frontend_config, JSON_UNESCAPED_SLASHES); ?>;
+    // Configuration injected server-side (no API token needed for GET requests)
+    const CONFIG = {
+        api_base_url: '<?php echo $config['api']['base_url']; ?>',
+        update_interval_seconds: <?php echo $config['app']['update_interval_seconds']; ?>,
+        timezone: '<?php echo $config['app']['timezone']; ?>',
+        challenge_end_date: '<?php echo $config['app']['challenge_end_date']; ?>'
+    };
     
-    console.log('Configuration loaded from server:', {
-      api_base_url: CONFIG.api_base_url,
-      update_interval: CONFIG.update_interval_seconds,
-      timezone: CONFIG.timezone,
-      token_present: CONFIG.api_token ? 'Yes' : 'No'
-    });
+    console.log('Configuration loaded from server:', CONFIG);
 
     function getTimeAgo(isoString) {
       const now = new Date();
@@ -191,10 +191,10 @@ $frontend_config = [
     }
 
     function updateLeaderboard() {
+      // No Authorization header needed for GET requests
       fetch(`${CONFIG.api_base_url}/leaderboard.php`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${CONFIG.api_token}`,
           'Content-Type': 'application/json'
         }
       })
