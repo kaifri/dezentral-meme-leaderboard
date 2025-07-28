@@ -1,0 +1,8 @@
+{
+  "challenge_start_date": "2025-01-27T22:00:00Z",
+  "challenge_end_date": "2025-08-03T22:00:00Z",
+  "update_interval_seconds": 30,
+  "cache_timeout_seconds": 35,
+  "timezone": "Europe/Berlin",
+  "admin_password": "your_secure_admin_password_here"
+}

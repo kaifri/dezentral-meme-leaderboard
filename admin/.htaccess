@@ -1,0 +1,16 @@
+# Block access to admin directory from external IPs (optional)
+# Uncomment and adjust IP addresses as needed
+#
+# <RequireAll>
+#     Require ip 127.0.0.1
+#     Require ip YOUR_IP_ADDRESS
+# </RequireAll>
+
+# Prevent directory listing
+Options -Indexes
+
+# Additional security headers
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options DENY
+    Header always set X-Content-Type-Options nosniff
+</IfModule>

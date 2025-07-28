@@ -90,6 +90,36 @@
   </div>
 
   <script>
+    // Load configuration
+    let appConfig = {};
+    let apiConfig = {};
+
+    // Fetch configuration on page load
+    Promise.all([
+      fetch('/config/app.json').then(r => r.json()),
+      fetch('/config/api.json').then(r => r.json())
+    ]).then(([app, api]) => {
+      appConfig = app;
+      apiConfig = api;
+      updateLeaderboard();
+      
+      // Start intervals after config is loaded
+      setInterval(updateLeaderboard, appConfig.update_interval_seconds * 1000);
+      setInterval(() => {
+        const lastUpdatedElement = document.getElementById("last-updated");
+        if (lastUpdatedElement.dataset.lastUpdate) {
+          lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
+        }
+      }, 60000);
+    }).catch(err => {
+      console.error("Failed to load configuration:", err);
+      // Fallback to defaults
+      appConfig = { update_interval_seconds: 30, timezone: 'Europe/Berlin' };
+      apiConfig = { api_base_url: '/api', api_token: 'your_api_token_here' };
+      updateLeaderboard();
+      setInterval(updateLeaderboard, 30000);
+    });
+
     function getTimeAgo(isoString) {
       const now = new Date();
       const updated = new Date(isoString);
@@ -167,8 +197,24 @@
     }
 
     function updateLeaderboard() {
-      fetch("data/leaderboard.json")
-        .then(res => res.json())
+      if (!apiConfig.api_base_url || !apiConfig.api_token) {
+        console.log("Configuration not yet loaded, skipping update");
+        return;
+      }
+
+      fetch(`${apiConfig.api_base_url}/leaderboard.php`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiConfig.api_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        })
         .then(json => {
           const tbody = document.getElementById("leaderboard-body");
           const mobileContainer = document.getElementById("mobile-leaderboard");
@@ -202,7 +248,7 @@
             challengeEnded.classList.add("hidden");
             const endDateUTC = new Date(json.challenge_end_date);
             endDate.textContent = endDateUTC.toLocaleString('de-DE', {
-              timeZone: 'Europe/Berlin',
+              timeZone: appConfig.timezone || 'Europe/Berlin',
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
@@ -273,18 +319,9 @@
         })
         .catch(err => {
           document.getElementById("last-updated").textContent = "Fehler beim Laden!";
-          console.error("Fehler beim Laden der JSON-Datei:", err);
+          console.error("Fehler beim Laden der API-Daten:", err);
         });
     }
-    
-    updateLeaderboard();
-    setInterval(updateLeaderboard, 30000);
-    setInterval(() => {
-      const lastUpdatedElement = document.getElementById("last-updated");
-      if (lastUpdatedElement.dataset.lastUpdate) {
-        lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
-      }
-    }, 60000);
   </script>
 
   <!-- Footer -->
@@ -306,4 +343,8 @@
             <span>Data updates every 5min • Page refreshes every 30sec</span>
           </div>
         </div>
-      </div
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

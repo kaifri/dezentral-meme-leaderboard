@@ -1,0 +1,6 @@
+{
+  "api_token": "your_secure_api_token_here",
+  "helius_api_key": "your_helius_api_key_here",
+  "api_base_url": "/api",
+  "winner_pot_wallet": "HuoAiJTK2qYQ7jgVDK7X9T1NBDV7nFzQQzwfvs4MtoKN"
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fsc0rp.com</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+      50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.6); }
+    }
+    
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+    
+    .pulse-glow {
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+    
+    .flicker {
+      animation: flicker 0.15s infinite linear;
+    }
+    
+    .gradient-text {
+      background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .terminal-text {
+      font-family: 'Courier New', monospace;
+      color: #00ff00;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+  <!-- Main Content -->
+  <div class="flex-1 flex items-center justify-center px-4">
+    <div class="text-center max-w-2xl">
+      <h1 class="text-6xl md:text-8xl font-bold mb-8 gradient-text pulse-glow">
+        fsc0rp
+      </h1>
+      <p class="text-xl md:text-2xl text-gray-400 mb-4">
+        Digital Solutions
+      </p>
+      <p class="text-lg text-gray-500 mb-8">
+        Blockchain • Trading • Web3 • AI
+      </p>
+      
+      <!-- Easter Egg -->
+      <div class="bg-gray-800/30 border border-gray-700 rounded-lg p-4 max-w-md mx-auto">
+        <p class="terminal-text text-sm mb-2 flicker">
+          > whoami
+        </p>
+        <p class="text-gray-400 text-xs">
+          When fsociety meets corp... 🤖
+        </p>
+        <p class="text-gray-500 text-xs mt-1">
+          // digital rebellion, one line of code at a time
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-8 text-center">
+    <p class="text-gray-500 text-sm">
+      © 2025 fsc0rp.com
+    </p>
+  </footer>
+
+  <!-- Background -->
+  <div class="fixed inset-0 pointer-events-none -z-10">
+    <div class="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+  </div>
+</body>
+</html>
