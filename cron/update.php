@@ -1,5 +1,4 @@
 <?php
-// filepath: cron/update.php
 // Cron job script - runs every 30 seconds
 // Enhanced version with proper error handling and logging
 
@@ -53,13 +52,38 @@ if (!$config || !is_array($config)) {
     exit(1);
 }
 
-// Set global variables from config
+// Set global variables from config BEFORE including leaderboard.php
 $HELIUS_API_KEY = $config['api']['helius_api_key'] ?? '';
 $WINNER_POT_WALLET = $config['api']['winner_pot_wallet'] ?? '';
 $CHALLENGE_END_DATE = $config['app']['challenge_end_date'] ?? '';
 $CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'] ?? 30;
 
-// Include the leaderboard functions
+// Set file paths BEFORE including leaderboard.php
+$CONFIG_FILE = __DIR__ . '/../config/wallets.json';
+$START_SOL_FILE = __DIR__ . '/../data/start_sol_balances.json';
+$DATA_FILE = __DIR__ . '/../data/leaderboard.json';
+
+// Log configuration values for debugging
+logMessage("Config loaded - API Key: " . (empty($HELIUS_API_KEY) ? 'EMPTY' : 'SET'), 'DEBUG');
+logMessage("Winner pot wallet: " . $WINNER_POT_WALLET, 'DEBUG');
+logMessage("Challenge end date: " . $CHALLENGE_END_DATE, 'DEBUG');
+logMessage("Config file: " . $CONFIG_FILE, 'DEBUG');
+logMessage("Data file: " . $DATA_FILE, 'DEBUG');
+
+// Check if required files exist
+if (!file_exists($CONFIG_FILE)) {
+    logMessage("Wallets config file not found: " . $CONFIG_FILE, 'FATAL');
+    if (file_exists($lockFile)) unlink($lockFile);
+    exit(1);
+}
+
+if (!file_exists($START_SOL_FILE)) {
+    logMessage("Start SOL balances file not found: " . $START_SOL_FILE, 'FATAL');
+    if (file_exists($lockFile)) unlink($lockFile);
+    exit(1);
+}
+
+// Include the leaderboard functions AFTER setting globals
 require_once __DIR__ . '/../api/leaderboard.php';
 
 // Set timezone
