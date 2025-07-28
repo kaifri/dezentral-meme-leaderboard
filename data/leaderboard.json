@@ -1,29 +1,13 @@
 {
-  "updated": "2025-07-28T20:41:23.503000+00:00",
+  "updated": "2025-07-28T20:55:12.116104+00:00",
   "data": [
     {
       "username": "LaVleR",
       "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
       "sol": 0.2331,
-      "tokens": 0.7274,
-      "total": 0.9605,
-      "change_pct": 97.31
-    },
-    {
-      "username": "Umut",
-      "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
-      "sol": 0.4197,
-      "tokens": 0.1938,
-      "total": 0.6135,
-      "change_pct": 22.7
-    },
-    {
-      "username": "Wozzelsepp",
-      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
-      "sol": 0.1385,
-      "tokens": 0.4152,
-      "total": 0.5537,
-      "change_pct": 10.74
+      "tokens": 0.7283,
+      "total": 0.9614,
+      "change_pct": 97.5
     },
     {
       "username": "hir0",
@@ -37,9 +21,17 @@
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.4456,
-      "total": 0.488,
-      "change_pct": -3.46
+      "tokens": 0.4462,
+      "total": 0.4886,
+      "change_pct": -3.34
+    },
+    {
+      "username": "Umut",
+      "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
+      "sol": 0.4197,
+      "tokens": 0,
+      "total": 0.4197,
+      "change_pct": -16.06
     },
     {
       "username": "Moge G",
@@ -50,20 +42,28 @@
       "change_pct": -71.46
     },
     {
+      "username": "Wozzelsepp",
+      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
+      "sol": 0.1385,
+      "tokens": 0,
+      "total": 0.1385,
+      "change_pct": -72.3
+    },
+    {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
       "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
       "sol": 0.0204,
-      "tokens": 0.1025,
-      "total": 0.1229,
-      "change_pct": -75.41
+      "tokens": 0.0803,
+      "total": 0.1007,
+      "change_pct": -79.85
     },
     {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.0034,
-      "tokens": 0.0179,
-      "total": 0.0213,
-      "change_pct": -95.74
+      "tokens": 0.014,
+      "total": 0.0174,
+      "change_pct": -96.52
     }
   ],
   "winner_pot": {
