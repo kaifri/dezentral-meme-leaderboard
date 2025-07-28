@@ -16,12 +16,22 @@
       50% { opacity: 0.8; }
     }
     
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    
     .winner-glow {
       animation: glow 2s ease-in-out infinite;
     }
     
     .pulse-slow {
       animation: pulse-slow 3s ease-in-out infinite;
+    }
+    
+    .shake {
+      animation: shake 0.5s ease-in-out;
     }
     
     .gradient-text {
@@ -31,23 +41,23 @@
     }
   </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-10 px-4">
-  <h1 class="text-5xl font-bold mb-4 gradient-text pulse-slow">🔥 BfdA Solana Shitcoin Contest 🔥</h1>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-4 sm:py-10 px-2 sm:px-4">
+  <h1 class="text-2xl sm:text-5xl font-bold mb-4 gradient-text pulse-slow text-center">🔥 BfdA Solana Shitcoin Contest 🔥</h1>
   
   <!-- Challenge Status Banner -->
-  <div id="challenge-status" class="mb-4 px-6 py-3 rounded-lg text-center hidden">
-    <div id="challenge-active" class="bg-gradient-to-r from-green-800 to-emerald-700 text-green-200 rounded-lg px-4 py-2 hidden">
-      🟢 Challenge läuft bis <span id="end-date" class="font-bold"></span>
+  <div id="challenge-status" class="mb-4 px-3 sm:px-6 py-2 sm:py-3 rounded-lg text-center hidden w-full max-w-md">
+    <div id="challenge-active" class="bg-gradient-to-r from-green-800 to-emerald-700 text-green-200 rounded-lg px-2 sm:px-4 py-2 hidden text-xs sm:text-sm">
+      🟢 Challenge läuft bis <span id="end-date" class="font-bold block sm:inline"></span>
     </div>
-    <div id="challenge-ended" class="bg-gradient-to-r from-red-800 to-red-700 text-red-200 rounded-lg px-4 py-2 hidden">
+    <div id="challenge-ended" class="bg-gradient-to-r from-red-800 to-red-700 text-red-200 rounded-lg px-2 sm:px-4 py-2 hidden text-xs sm:text-sm">
       🔴 Challenge beendet! Finale Ergebnisse
     </div>
   </div>
 
   <!-- Winner Pot Display -->
-  <div id="winner-pot" class="mb-6 bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-800 px-8 py-4 rounded-xl text-center shadow-2xl hidden">
-    <div class="text-yellow-200 text-sm">🏆 Gewinner-Pot</div>
-    <div class="text-yellow-100 text-2xl font-bold"><span id="pot-balance">0</span> SOL</div>
+  <div id="winner-pot" class="mb-4 sm:mb-6 bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-800 px-4 sm:px-8 py-3 sm:py-4 rounded-xl text-center shadow-2xl hidden w-full max-w-sm">
+    <div class="text-yellow-200 text-xs sm:text-sm">🏆 Gewinner-Pot</div>
+    <div class="text-yellow-100 text-lg sm:text-2xl font-bold"><span id="pot-balance">0</span> SOL</div>
     <div class="text-yellow-200 text-xs">
       Wallet: 
       <a href="#" id="pot-wallet-link" target="_blank" class="font-mono hover:text-yellow-100 underline transition-colors">
@@ -56,31 +66,41 @@
     </div>
   </div>
 
-  <p class="mb-6 text-sm text-gray-400">🕒 Update: <span id="last-updated">...</span></p>
+  <p class="mb-4 sm:mb-6 text-xs sm:text-sm text-gray-400">🕒 Update: <span id="last-updated">...</span></p>
   
-  <div class="w-full max-w-6xl overflow-x-auto">
+  <!-- Desktop Table View -->
+  <div class="hidden md:block w-full max-w-7xl overflow-x-auto">
     <table class="min-w-full bg-gray-800 shadow-2xl rounded-xl overflow-hidden">
       <thead class="bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-600 text-left">
         <tr>
-          <th class="px-6 py-4 font-bold text-yellow-900">#</th>
-          <th class="px-6 py-4 font-bold text-yellow-900">Username</th>
-          <th class="px-6 py-4 font-bold text-yellow-900">Wallet</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">SOL</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Tokens</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Total (SOL)</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">% Change</th>
+          <th class="px-4 py-4 font-bold text-yellow-900">#</th>
+          <th class="px-4 py-4 font-bold text-yellow-900">Username</th>
+          <th class="px-4 py-4 font-bold text-yellow-900">Wallet</th>
+          <th class="px-4 py-4 text-right font-bold text-yellow-900">SOL</th>
+          <th class="px-4 py-4 text-right font-bold text-yellow-900">Tokens</th>
+          <th class="px-4 py-4 text-right font-bold text-yellow-900">Total (SOL)</th>
+          <th class="px-4 py-4 text-right font-bold text-yellow-900">% Change</th>
+          <th class="px-4 py-4 text-center font-bold text-yellow-900">⚠️</th>
         </tr>
       </thead>
       <tbody id="leaderboard-body"></tbody>
     </table>
   </div>
 
+  <!-- Mobile Card View -->
+  <div class="md:hidden w-full max-w-sm space-y-3" id="mobile-leaderboard">
+    <!-- Cards will be generated here -->
+  </div>
+
   <!-- Winner Announcement -->
-  <div id="winner-announcement" class="mt-8 bg-gradient-to-r from-yellow-700 via-orange-600 to-yellow-700 px-8 py-6 rounded-xl text-center shadow-2xl winner-glow hidden">
-    <div class="text-3xl mb-3">🎉 Herzlichen Glückwunsch! 🎉</div>
-    <div class="text-2xl text-yellow-200 mb-3">Gewinner: <span id="winner-name" class="font-bold gradient-text"></span></div>
-    <div class="text-xl">Endstand: <span id="winner-total" class="font-bold text-yellow-100"></span> SOL</div>
-    <div class="text-lg text-yellow-200 mt-2">Gewinn: <span id="winner-change" class="font-bold"></span>%</div>
+  <div id="winner-announcement" class="mt-6 sm:mt-8 bg-gradient-to-r from-yellow-700 via-orange-600 to-yellow-700 px-4 sm:px-8 py-4 sm:py-6 rounded-xl text-center shadow-2xl winner-glow hidden w-full max-w-md">
+    <div class="text-xl sm:text-3xl mb-2 sm:mb-3">🎉 Herzlichen Glückwunsch! 🎉</div>
+    <div class="text-lg sm:text-2xl text-yellow-200 mb-2 sm:mb-3">Gewinner: <span id="winner-name" class="font-bold gradient-text"></span></div>
+    <div class="text-base sm:text-xl">Endstand: <span id="winner-total" class="font-bold text-yellow-100"></span> SOL</div>
+    <div class="text-sm sm:text-lg text-yellow-200 mt-2">Gewinn: <span id="winner-change" class="font-bold"></span>%</div>
+    <div id="winner-deposit-warning" class="text-xs sm:text-sm text-red-300 mt-2 hidden">
+      ⚠️ Warnung: SOL-Deposits während Challenge erkannt!
+    </div>
   </div>
 
   <script>
@@ -113,11 +133,72 @@
       }
     }
 
+    function getDepositWarning(entry) {
+      if (entry.has_deposits) {
+        return `<div class="text-xs text-red-400 mt-1 shake">⚠️ Deposit: +${entry.sol_deposits.toFixed(4)} SOL</div>`;
+      }
+      return '';
+    }
+
+    function createMobileCard(entry, rank, challengeEnded) {
+      const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
+      const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+      
+      let cardClass = "bg-gray-800 rounded-lg p-4 shadow-lg";
+      let rankDisplay = getRankEmoji(rank);
+      
+      if (rank === 1) {
+        cardClass = "bg-gradient-to-r from-yellow-900 to-yellow-800 border-l-4 border-yellow-400 rounded-lg p-4 shadow-lg";
+        if (challengeEnded) cardClass += " winner-glow";
+      } else if (rank === 2) {
+        cardClass = "bg-gradient-to-r from-gray-800 to-gray-700 border-l-4 border-gray-400 rounded-lg p-4 shadow-lg";
+      } else if (rank === 3) {
+        cardClass = "bg-gradient-to-r from-orange-900 to-orange-800 border-l-4 border-orange-400 rounded-lg p-4 shadow-lg";
+      }
+
+      // Add red border if deposits detected
+      if (entry.has_deposits) {
+        cardClass += " border-r-4 border-red-500";
+      }
+
+      return `
+        <div class="${cardClass}">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-3">
+              <span class="text-2xl font-bold">${rankDisplay}</span>
+              <div>
+                <div class="font-semibold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-white' : 'text-gray-200'}">${entry.username}</div>
+                <a href="https://solscan.io/account/${entry.wallet}" target="_blank" class="text-xs text-gray-400 hover:text-blue-400 transition-colors">
+                  ${entry.wallet.slice(0, 8)}...${entry.wallet.slice(-6)}
+                </a>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-yellow-400' : 'text-yellow-400'}">${entry.total.toFixed(4)} SOL</div>
+              <div class="text-xs ${changeColor} font-mono">${changeText} ${entry.change_pct.toFixed(2)}%</div>
+              ${entry.has_deposits ? `<div class="text-xs text-red-400 mt-1">⚠️ +${entry.sol_deposits.toFixed(4)} SOL</div>` : ''}
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span class="text-gray-400">SOL:</span>
+              <span class="font-mono ml-1">${entry.sol.toFixed(4)}</span>
+            </div>
+            <div>
+              <span class="text-gray-400">Tokens:</span>
+              <span class="font-mono ml-1 text-green-400">${entry.tokens.toFixed(4)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function updateLeaderboard() {
       fetch("data/leaderboard.json")
         .then(res => res.json())
         .then(json => {
           const tbody = document.getElementById("leaderboard-body");
+          const mobileContainer = document.getElementById("mobile-leaderboard");
           const updated = document.getElementById("last-updated");
           const challengeStatus = document.getElementById("challenge-status");
           const challengeActive = document.getElementById("challenge-active");
@@ -131,11 +212,13 @@
           const winnerName = document.getElementById("winner-name");
           const winnerTotal = document.getElementById("winner-total");
           const winnerChange = document.getElementById("winner-change");
+          const winnerDepositWarning = document.getElementById("winner-deposit-warning");
 
           // Update "updated x minutes ago"
           updated.textContent = getTimeAgo(json.updated);
           updated.dataset.lastUpdate = json.updated;
           tbody.innerHTML = "";
+          mobileContainer.innerHTML = "";
 
           // Update challenge status
           challengeStatus.classList.remove("hidden");
@@ -172,14 +255,20 @@
             winnerName.textContent = winner.username;
             winnerTotal.textContent = winner.total.toFixed(4);
             winnerChange.textContent = winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2);
+            
+            // Show deposit warning if winner deposited SOL
+            if (winner.has_deposits) {
+              winnerDepositWarning.classList.remove("hidden");
+            }
           }
 
+          // Generate both desktop table and mobile cards
           json.data.forEach((entry, i) => {
             const rank = i + 1;
             const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
             const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
             
-            // Special styling based on rank
+            // Desktop table row
             let rowClass = "hover:bg-gray-700 transition-colors";
             let rankDisplay = getRankEmoji(rank);
             
@@ -194,22 +283,36 @@
               rowClass += i % 2 === 0 ? " bg-gray-800" : " bg-gray-700";
             }
 
+            // Add red right border if deposits detected
+            if (entry.has_deposits) {
+              rowClass += " border-r-4 border-red-500";
+            }
+
             const row = document.createElement("tr");
             row.className = rowClass;
             row.innerHTML = `
-              <td class="px-6 py-4 font-bold text-lg ${rank <= 3 ? 'text-2xl' : ''}">${rankDisplay}</td>
-              <td class="px-6 py-4 ${rank === 1 ? 'font-bold text-yellow-200 text-lg' : rank <= 3 ? 'font-semibold' : ''}">${entry.username}</td>
-              <td class="px-6 py-4 text-sm text-gray-300">
+              <td class="px-4 py-4 font-bold text-lg ${rank <= 3 ? 'text-2xl' : ''}">${rankDisplay}</td>
+              <td class="px-4 py-4 ${rank === 1 ? 'font-bold text-yellow-200 text-lg' : rank <= 3 ? 'font-semibold' : ''}">${entry.username}</td>
+              <td class="px-4 py-4 text-sm text-gray-300">
                 <a href="https://solscan.io/account/${entry.wallet}" target="_blank" class="hover:text-blue-400 transition-colors">
                   ${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}
                 </a>
               </td>
-              <td class="px-6 py-4 text-right font-mono">${entry.sol.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right text-green-400 font-mono">${entry.tokens.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${entry.total.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
+              <td class="px-4 py-4 text-right font-mono">${entry.sol.toFixed(4)}</td>
+              <td class="px-4 py-4 text-right text-green-400 font-mono">${entry.tokens.toFixed(4)}</td>
+              <td class="px-4 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${entry.total.toFixed(4)}</td>
+              <td class="px-4 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
+              <td class="px-4 py-4 text-center">
+                ${entry.has_deposits ? 
+                  `<div class="text-red-400 text-sm shake" title="SOL Deposit erkannt: +${entry.sol_deposits.toFixed(4)} SOL">⚠️</div>` : 
+                  '<span class="text-gray-600">✓</span>'
+                }
+              </td>
             `;
             tbody.appendChild(row);
+
+            // Mobile card
+            mobileContainer.innerHTML += createMobileCard(entry, rank, json.challenge_ended);
           });
         })
         .catch(err => {
@@ -218,8 +321,8 @@
         });
     }
     
-    updateLeaderboard();
-    setInterval(updateLeaderboard, 300000);
+     updateLeaderboard();
+    setInterval(updateLeaderboard, 30000); // Changed from 300000 to 30000 (30 seconds)
     setInterval(() => {
       const lastUpdatedElement = document.getElementById("last-updated");
       if (lastUpdatedElement.dataset.lastUpdate) {
@@ -227,5 +330,57 @@
       }
     }, 60000);
   </script>
+
+  <!-- Footer -->
+  <footer class="mt-12 mb-6 w-full max-w-4xl">
+    <div class="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-xl p-6 shadow-2xl border border-gray-600">
+      <div class="flex flex-col items-center justify-center space-y-4">
+        
+        <!-- Dev Info -->
+        <div class="flex items-center space-x-3">
+          <div class="relative">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+              <span class="text-xl font-bold text-white">🧔</span>
+            </div>
+            <div class="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-gray-800 animate-pulse"></div>
+          </div>
+          <div class="text-center">
+            <div class="text-sm font-semibold text-gray-300">Crafted with ⚡ by</div>
+            <div class="text-2xl font-bold gradient-text">BeardedViking</div>
+          </div>
+        </div>
+
+        <!-- Update Info -->
+        <div class="text-center">
+          <div class="flex items-center justify-center space-x-2 text-sm text-gray-400">
+            <span class="animate-bounce">⚡</span>
+            <span>Data updates every 5min • Page refreshes every 30sec</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Bottom Line - Terminal Style -->
+      <div class="mt-4 pt-4 border-t border-gray-600">
+        <div class="flex items-center justify-center space-x-2 text-xs font-mono text-gray-500">
+          <span class="text-green-400">$</span>
+          <span class="typing-animation">echo "May the best shitcoiner win! 🚀"</span>
+          <span class="w-2 h-4 bg-green-400 animate-pulse ml-1"></span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <style>
+    @keyframes typing {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+    
+    .typing-animation {
+      overflow: hidden;
+      white-space: nowrap;
+      animation: typing 3s steps(30, end) infinite;
+    }
+  </style>
 </body>
 </html>
