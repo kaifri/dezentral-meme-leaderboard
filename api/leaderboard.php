@@ -73,14 +73,25 @@ function getTokenPrice($mint) {
     $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
     $response = @file_get_contents($url);
     
-    if ($response === false) return 0;
+    // Add debug logging
+    error_log("Fetching price for token: {$mint}");
+    
+    if ($response === false) {
+        error_log("Failed to fetch data from Dexscreener for token: {$mint}");
+        return 0;
+    }
     
     $data = json_decode($response, true);
     $pairs = $data['pairs'] ?? [];
     
-    if (empty($pairs)) return 0;
+    if (empty($pairs)) {
+        error_log("No trading pairs found for token: {$mint}");
+        return 0;
+    }
     
-    // Sort by liquidity
+    error_log("Found " . count($pairs) . " pairs for token: {$mint}");
+    
+    // Sort by liquidity (USD value)
     usort($pairs, function($a, $b) {
         $liqA = floatval($a['liquidity']['usd'] ?? 0);
         $liqB = floatval($b['liquidity']['usd'] ?? 0);
@@ -92,13 +103,22 @@ function getTokenPrice($mint) {
         $quoteToken = $pair['quoteToken']['address'] ?? '';
         $priceUsd = floatval($pair['priceUsd'] ?? 0);
         
+        error_log("Checking pair: base={$baseToken}, quote={$quoteToken}, priceUsd={$priceUsd}");
+        
+        // If our token is the base token, use priceUsd directly
         if ($baseToken === $mint && $priceUsd > 0) {
+            error_log("Found price for {$mint} as base token: {$priceUsd}");
             return $priceUsd;
-        } elseif ($quoteToken === $mint && $priceUsd > 0) {
-            return 1 / $priceUsd;
+        }
+        // If our token is the quote token, invert the price
+        elseif ($quoteToken === $mint && $priceUsd > 0) {
+            $invertedPrice = 1 / $priceUsd;
+            error_log("Found inverted price for {$mint} as quote token: {$invertedPrice}");
+            return $invertedPrice;
         }
     }
     
+    error_log("No valid price found for token: {$mint}");
     return 0;
 }
 
@@ -219,20 +239,20 @@ function updateLeaderboard() {
 
 // Handle request
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    // No auth required anymore
-    
-    // Return cached data if exists and is recent
+    // Return cached data if exists
     if (file_exists($DATA_FILE)) {
-        $fileTime = filemtime($DATA_FILE);
-        if (time() - $fileTime < $CACHE_TIMEOUT) {
-            echo file_get_contents($DATA_FILE);
-            exit;
-        }
+        echo file_get_contents($DATA_FILE);
+        exit;
     }
     
-    // Update and return new data
-    $data = updateLeaderboard();
-    echo json_encode($data);
+    // If no cached data exists, return empty structure
+    echo json_encode([
+        'updated' => null,
+        'data' => [],
+        'winner_pot' => ['wallet' => $WINNER_POT_WALLET, 'balance' => 0],
+        'challenge_ended' => false,
+        'challenge_end_date' => $CHALLENGE_END_DATE
+    ]);
     
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Keep auth for manual updates via POST
@@ -241,10 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Manual update
     $data = updateLeaderboard();
     echo json_encode(['message' => 'Update successful', 'data' => $data]);
-    
-} else {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
 }
 
 // Auth check function (only used for POST requests now)

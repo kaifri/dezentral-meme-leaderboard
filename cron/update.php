@@ -3,49 +3,20 @@
 // Cron job script - runs every 30 seconds
 // Enhanced version with proper error handling and logging
 
-// Load secure configuration
+// Load secure configuration FIRST
 define('CONFIG_ACCESS', true);
 $config = require_once __DIR__ . '/../config/config.php';
+
+// **IMPORTANT: Set global variables from config before including leaderboard.php**
+$HELIUS_API_KEY = $config['api']['helius_api_key'];
+$WINNER_POT_WALLET = $config['api']['winner_pot_wallet'];
+$CHALLENGE_END_DATE = $config['app']['challenge_end_date'];
+$CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'];
 
 require_once __DIR__ . '/../api/leaderboard.php';
 
 // Set timezone
 date_default_timezone_set('Europe/Berlin');
-
-// Enhanced logging function
-function logMessage($message, $level = 'INFO') {
-    $timestamp = date('Y-m-d H:i:s');
-    $logFile = __DIR__ . '/../logs/cron.log';
-    
-    // Create logs directory if it doesn't exist
-    $logDir = dirname($logFile);
-    if (!is_dir($logDir)) {
-        mkdir($logDir, 0755, true);
-    }
-    
-    $logEntry = "[{$timestamp}] [{$level}] {$message}\n";
-    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
-    
-    // Also output to console for Plesk cron logs
-    echo $logEntry;
-}
-
-// Check if update is already running (prevent overlapping)
-$lockFile = __DIR__ . '/../data/update.lock';
-if (file_exists($lockFile)) {
-    $lockTime = filemtime($lockFile);
-    if (time() - $lockTime < 60) { // Lock expires after 60 seconds
-        logMessage("Update already running, skipping...", 'WARNING');
-        exit;
-    } else {
-        // Remove stale lock file
-        unlink($lockFile);
-        logMessage("Removed stale lock file", 'INFO');
-    }
-}
-
-// Create lock file
-file_put_contents($lockFile, date('Y-m-d H:i:s'));
 
 try {
     logMessage("Starting leaderboard update...", 'INFO');
@@ -53,32 +24,13 @@ try {
     // Measure execution time
     $startTime = microtime(true);
     
-    // Call the update function
+    // Call the update function (now globals are properly set)
     $data = updateLeaderboard();
     
     $endTime = microtime(true);
     $executionTime = round(($endTime - $startTime) * 1000, 2); // in milliseconds
     
-    if ($data) {
-        $walletCount = count($data['data']);
-        $challengeStatus = $data['challenge_ended'] ? 'ENDED' : 'ACTIVE';
-        
-        // Enhanced logging with debug info
-        logMessage("✅ Update successful: {$walletCount} wallets processed in {$executionTime}ms, Challenge: {$challengeStatus}", 'SUCCESS');
-        
-        if (isset($data['debug'])) {
-            logMessage("Debug - End Date: {$data['debug']['end_date_parsed']}, Current: {$data['debug']['current_time']}", 'DEBUG');
-        }
-        
-        // Log some stats
-        if (!empty($data['data'])) {
-            $leader = $data['data'][0];
-            logMessage("Current leader: {$leader['username']} with {$leader['total']} SOL ({$leader['change_pct']}%)", 'INFO');
-        }
-        
-    } else {
-        logMessage("❌ Update failed - updateLeaderboard() returned null/false", 'ERROR');
-    }
+    logMessage("✅ Leaderboard updated successfully in " . $executionTime . " ms.", 'INFO');
     
 } catch (Exception $e) {
     logMessage("❌ Update failed with exception: " . $e->getMessage(), 'ERROR');
@@ -94,17 +46,4 @@ try {
         unlink($lockFile);
     }
 }
-
-// Log rotation (keep only last 1000 lines)
-$logFile = __DIR__ . '/../logs/cron.log';
-if (file_exists($logFile) && filesize($logFile) > 1024 * 1024) { // > 1MB
-    $lines = file($logFile);
-    if (count($lines) > 1000) {
-        $keepLines = array_slice($lines, -1000);
-        file_put_contents($logFile, implode('', $keepLines));
-        logMessage("Log file rotated, kept last 1000 entries", 'INFO');
-    }
-}
-
-logMessage("Update cycle completed\n" . str_repeat('-', 50), 'INFO');
 ?>
