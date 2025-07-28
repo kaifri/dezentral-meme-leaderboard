@@ -11,7 +11,10 @@ load_dotenv()
 CONFIG = "config/wallets.json"
 OUTPUT = "data/leaderboard.json"
 START_SOL_PATH = "data/start_sol_balances.json"
-START_DATE = datetime(2025, 7, 27, 22, 0, 1, tzinfo=timezone.utc)
+START_DATE = datetime(2025, 1, 27, 22, 0, 1, tzinfo=timezone.utc)
+CHALLENGE_END_DATE = datetime(2025, 8, 4, 0, 0, 0, tzinfo=timezone.utc)
+WINNER_POT_WALLET = "HuoAiJTK2qYQ7jgVDK7X9T1NBDV7nFzQQzwfvs4MtoKN"
+# Note: Frontend should use https://solscan.io/account/{wallet} for wallet links
 
 # Get API key from environment variable
 HELIUS_API_KEY = os.getenv("HELIUS_API_KEY")
@@ -221,6 +224,13 @@ try:
 except:
     start_sols = {}
 
+# Check if challenge has ended
+current_time = datetime.now(timezone.utc)
+challenge_ended = current_time >= CHALLENGE_END_DATE
+
+# Get winner pot balance
+winner_pot_balance = get_sol_balance(WINNER_POT_WALLET)
+
 leaderboard = []
 
 sol_price_usd = get_sol_price_usd()
@@ -234,16 +244,28 @@ for entry in wallets:
         continue
 
     sol = get_sol_balance(wallet)
-    tokens = get_token_transfers(wallet)
-    logging.info(f"get_token_transfers({wallet}) returned: {tokens}")
+    
+    # Only update token values if challenge hasn't ended
+    if not challenge_ended:
+        tokens = get_token_transfers(wallet)
+        logging.info(f"get_token_transfers({wallet}) returned: {tokens}")
 
-    token_value = 0
-    if tokens:
-        logging.info(f"Wallet {wallet} tokens: " + ", ".join([f"{mint}: {amount}" for mint, amount in tokens.items()]))
-        prices = get_token_prices_in_sol(tokens.keys(), sol_price_usd)
-        for mint, amount in tokens.items():
-            logging.info(f"Wallet {wallet}: {amount} of token {mint} at price {prices.get(mint, 0)}")
-            token_value += amount * prices.get(mint, 0)
+        token_value = 0
+        if tokens:
+            logging.info(f"Wallet {wallet} tokens: " + ", ".join([f"{mint}: {amount}" for mint, amount in tokens.items()]))
+            prices = get_token_prices_in_sol(tokens.keys(), sol_price_usd)
+            for mint, amount in tokens.items():
+                logging.info(f"Wallet {wallet}: {amount} of token {mint} at price {prices.get(mint, 0)}")
+                token_value += amount * prices.get(mint, 0)
+    else:
+        # Challenge ended, use frozen token values from last update if available
+        try:
+            with open(OUTPUT, "r") as f:
+                last_data = json.load(f)
+                last_entry = next((item for item in last_data["data"] if item["wallet"] == wallet), None)
+                token_value = last_entry["tokens"] if last_entry else 0
+        except:
+            token_value = 0
 
     total = sol + token_value
     start = start_sols[wallet]
@@ -261,4 +283,13 @@ for entry in wallets:
 leaderboard.sort(key=lambda x: x["total"], reverse=True)
 
 with open(OUTPUT, "w") as f:
-    json.dump({"updated": datetime.now(timezone.utc).isoformat() + "Z", "data": leaderboard}, f, indent=2)
+    json.dump({
+        "updated": datetime.now(timezone.utc).isoformat(),
+        "data": leaderboard,
+        "winner_pot": {
+            "wallet": WINNER_POT_WALLET,
+            "balance": round(winner_pot_balance, 4)
+        },
+        "challenge_ended": challenge_ended,
+        "challenge_end_date": CHALLENGE_END_DATE.isoformat()
+    }, f, indent=2)
