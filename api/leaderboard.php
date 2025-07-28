@@ -5,9 +5,38 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Load secure configuration
+// Load secure configuration with better error handling
 define('CONFIG_ACCESS', true);
-$config = require_once __DIR__ . '/../config/config.php';
+$configPath = __DIR__ . '/../config/config.php';
+if (!file_exists($configPath)) {
+    logMessage("ERROR: Config file not found at {$configPath}", 'ERROR');
+    // Create a minimal default config
+    $config = [
+        'app' => [
+            'challenge_end_date' => '2025-08-03T22:00:00Z',
+            'cache_timeout_seconds' => 300,
+        ],
+        'api' => [
+            'token' => 'default_token',
+            'helius_api_key' => 'default_key',
+            'winner_pot_wallet' => '3FagRkF14zLxk49rMoWxB8nvL3PmcHbQoceikuQfFeP6',
+        ]
+    ];
+} else {
+    try {
+        $config = require_once $configPath;
+        logMessage("Config loaded successfully", 'INFO');
+        logMessage("Config contains challenge_end_date: " . 
+                  (isset($config['app']['challenge_end_date']) ? 'YES' : 'NO'), 'DEBUG');
+    } catch (Exception $e) {
+        logMessage("ERROR loading config: " . $e->getMessage(), 'ERROR');
+        // Fallback config
+        $config = [
+            'app' => ['challenge_end_date' => '2025-08-03T22:00:00Z', 'cache_timeout_seconds' => 300],
+            'api' => ['token' => 'default', 'helius_api_key' => 'default', 'winner_pot_wallet' => '3FagRkF14zLxk49rMoWxB8nvL3PmcHbQoceikuQfFeP6']
+        ];
+    }
+}
 
 // File paths
 $DATA_FILE = __DIR__ . '/../data/leaderboard.json';
@@ -263,19 +292,14 @@ function updateLeaderboard($configInput = null) {
     
     logMessage("Starting leaderboard update...", 'INFO');
     
-    // Load config - priority: parameter > global > file
+    // Load config - simplified
     if ($configInput) {
-        $configToUse = $configInput; // Renamed to avoid shadowing
-    } elseif (isset($GLOBALS['config'])) {
-        $configToUse = $GLOBALS['config'];
+        $configToUse = $configInput;
     } else {
-        // Fallback: load config directly
-        define('CONFIG_ACCESS', true);
-        $configToUse = require_once __DIR__ . '/../config/config.php';
+        $configToUse = $GLOBALS['config'];
     }
-    
-    // Debug the config we're actually using
-    logMessage("Config structure: " . (isset($configToUse['app']['challenge_end_date']) ? 
+
+    logMessage("Config in updateLeaderboard: " . (isset($configToUse['app']['challenge_end_date']) ? 
         "Has challenge_end_date: " . $configToUse['app']['challenge_end_date'] : 
         "Missing challenge_end_date"), 'DEBUG');
     
