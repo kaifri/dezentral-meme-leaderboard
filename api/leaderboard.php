@@ -444,13 +444,17 @@ function fetchTransactionsFromHelius($wallet, $startTimestamp) {
         foreach ($data as $tx) {
             $txTimestamp = $tx['timestamp'] ?? 0;
             
-            // Stop if we've gone past our start date
+            // Stop if we've gone past our start date (too old)
             if ($txTimestamp < $startTimestamp) {
                 $foundOlderTx = true;
                 break;
             }
             
-            $allTransactions[] = $tx;
+            // Only include transactions from challenge start onwards
+            if ($txTimestamp >= $startTimestamp) {
+                $allTransactions[] = $tx;
+            }
+            
             $before = $tx['signature'] ?? null;
         }
         
@@ -466,7 +470,7 @@ function fetchTransactionsFromHelius($wallet, $startTimestamp) {
         
     } while (true);
     
-    logMessage("Fetched " . count($allTransactions) . " transactions from Helius in " . $pageCount . " pages", 'DEBUG');
+    logMessage("Fetched " . count($allTransactions) . " transactions from Helius in " . $pageCount . " pages (filtered from challenge start)", 'DEBUG');
     
     return $allTransactions;
 }
