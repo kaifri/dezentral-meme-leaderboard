@@ -1,0 +1,33 @@
+# Block access to old HTML file (if it still exists)
+<Files "index.html">
+    Require all denied
+</Files>
+
+# Block access to config files
+<Files "config.php">
+    Require all denied
+</Files>
+
+<Files "*.json">
+    Require all denied
+</Files>
+
+# Block sensitive directories
+<Directory "config">
+    Require all denied
+</Directory>
+
+<Directory "data">
+    Require all denied
+</Directory>
+
+<Directory "cron">
+    Require all denied
+</Directory>
+
+<Directory "logs">
+    Require all denied
+</Directory>
+
+# Set index.php as default
+DirectoryIndex index.php index.html

@@ -1,3 +1,17 @@
+<?php
+// Load secure configuration server-side
+define('CONFIG_ACCESS', true);
+$config = require_once __DIR__ . '/config/config.php';
+
+// Extract only what the frontend needs (no sensitive data)
+$frontend_config = [
+    'api_base_url' => $config['api']['base_url'],
+    'api_token' => $config['api']['token'], // This will be embedded in JS, but not in a separate file
+    'update_interval_seconds' => $config['app']['update_interval_seconds'],
+    'timezone' => $config['app']['timezone'],
+    'challenge_end_date' => $config['app']['challenge_end_date']
+];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,34 +104,14 @@
   </div>
 
   <script>
-    // Load configuration
-    let appConfig = {};
-    let apiConfig = {};
-
-    // Fetch configuration on page load
-    Promise.all([
-      fetch('/config/app.json').then(r => r.json()),
-      fetch('/config/api.json').then(r => r.json())
-    ]).then(([app, api]) => {
-      appConfig = app;
-      apiConfig = api;
-      updateLeaderboard();
-      
-      // Start intervals after config is loaded
-      setInterval(updateLeaderboard, appConfig.update_interval_seconds * 1000);
-      setInterval(() => {
-        const lastUpdatedElement = document.getElementById("last-updated");
-        if (lastUpdatedElement.dataset.lastUpdate) {
-          lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
-        }
-      }, 60000);
-    }).catch(err => {
-      console.error("Failed to load configuration:", err);
-      // Fallback to defaults
-      appConfig = { update_interval_seconds: 30, timezone: 'Europe/Berlin' };
-      apiConfig = { api_base_url: '/api', api_token: 'your_api_token_here' };
-      updateLeaderboard();
-      setInterval(updateLeaderboard, 30000);
+    // Configuration injected server-side (secure - no external config files needed)
+    const CONFIG = <?php echo json_encode($frontend_config, JSON_UNESCAPED_SLASHES); ?>;
+    
+    console.log('Configuration loaded from server:', {
+      api_base_url: CONFIG.api_base_url,
+      update_interval: CONFIG.update_interval_seconds,
+      timezone: CONFIG.timezone,
+      token_present: CONFIG.api_token ? 'Yes' : 'No'
     });
 
     function getTimeAgo(isoString) {
@@ -197,15 +191,10 @@
     }
 
     function updateLeaderboard() {
-      if (!apiConfig.api_base_url || !apiConfig.api_token) {
-        console.log("Configuration not yet loaded, skipping update");
-        return;
-      }
-
-      fetch(`${apiConfig.api_base_url}/leaderboard.php`, {
+      fetch(`${CONFIG.api_base_url}/leaderboard.php`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiConfig.api_token}`,
+          'Authorization': `Bearer ${CONFIG.api_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -248,7 +237,7 @@
             challengeEnded.classList.add("hidden");
             const endDateUTC = new Date(json.challenge_end_date);
             endDate.textContent = endDateUTC.toLocaleString('de-DE', {
-              timeZone: appConfig.timezone || 'Europe/Berlin',
+              timeZone: CONFIG.timezone,
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
@@ -322,6 +311,18 @@
           console.error("Fehler beim Laden der API-Daten:", err);
         });
     }
+
+    // Start the application
+    updateLeaderboard();
+    setInterval(updateLeaderboard, CONFIG.update_interval_seconds * 1000);
+    
+    // Update time display every minute
+    setInterval(() => {
+      const lastUpdatedElement = document.getElementById("last-updated");
+      if (lastUpdatedElement.dataset.lastUpdate) {
+        lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
+      }
+    }, 60000);
   </script>
 
   <!-- Footer -->
@@ -340,7 +341,7 @@
         <!-- Update Info -->
         <div class="text-center">
           <div class="flex items-center justify-center space-x-2 text-sm text-gray-400">
-            <span>Data updates every 5min • Page refreshes every 30sec</span>
+            <span>Data updates every <?php echo $config['app']['update_interval_seconds']; ?>s • Page refreshes every 30sec</span>
           </div>
         </div>
       </div>

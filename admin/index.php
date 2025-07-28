@@ -2,9 +2,11 @@
 // filepath: /admin/index.php
 session_start();
 
-// Load configuration
-$app_config = json_decode(file_get_contents(__DIR__ . '/../config/app.json'), true);
-$ADMIN_PASSWORD = $app_config['admin_password'];
+// Load secure configuration
+define('CONFIG_ACCESS', true);
+$config = require_once __DIR__ . '/../config/config.php';
+
+$ADMIN_PASSWORD = $config['app']['admin_password'];
 
 // File paths
 $WALLETS_FILE = __DIR__ . '/../config/wallets.json';
