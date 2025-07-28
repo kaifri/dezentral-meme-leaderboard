@@ -42,75 +42,75 @@ def get_sol_balance(wallet):
         logging.error(f"Failed to get SOL balance for {wallet}: {e}")
         return 0
 
-def get_sol_deposits_since_start(wallet):
-    """Check for SOL deposits (not from token sales) since challenge start"""
-    url = f"https://api.helius.xyz/v0/addresses/{wallet}/transactions?api-key={HELIUS_API_KEY}&limit=100"
-    try:
-        response = requests.get(url)
-        if response.status_code != 200:
-            logging.warning(f"Failed to get transactions for {wallet}: {response.status_code}")
-            return 0.0
-            
-        transactions = response.json()
-        total_deposits = 0.0
-        
-        for tx in transactions:
-            try:
-                # Skip if transaction is before challenge start
-                tx_timestamp = tx.get("timestamp", 0)
-                tx_date = datetime.fromtimestamp(tx_timestamp, tz=timezone.utc)
-                if tx_date < START_DATE:
-                    continue
-                
-                # Check native transfers (SOL deposits)
-                native_transfers = tx.get("nativeTransfers", [])
-                for transfer in native_transfers:
-                    # Check if this wallet received SOL
-                    if transfer.get("toUserAccount") == wallet:
-                        amount_sol = transfer.get("amount", 0) / 1_000_000_000
-                        from_account = transfer.get("fromUserAccount")
-                        
-                        # Skip if it's from a DEX/program (likely token sale proceeds)
-                        # Common DEX program addresses to exclude
-                        dex_programs = [
-                            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",  # Jupiter
-                            "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",  # Raydium
-                            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",  # Raydium AMM
-                            "22Y43yTVxuUkoRKdm9thyRhQ3SdgQS7c7kB6UNCiaczD",  # Serum DEX
-                        ]
-                        
-                        # Skip if from known DEX programs or system program
-                        if from_account in dex_programs or from_account == "11111111111111111111111111111111":
-                            continue
-                            
-                        # Check transaction type - skip if it involves token swaps
-                        tx_type = tx.get("type")
-                        if tx_type in ["SWAP", "DEX_TRADE"]:
-                            continue
-                            
-                        # Check if there are token transfers in the same transaction (likely a swap)
-                        token_transfers = tx.get("tokenTransfers", [])
-                        has_token_activity = any(
-                            t.get("toUserAccount") == wallet or t.get("fromUserAccount") == wallet 
-                            for t in token_transfers
-                        )
-                        
-                        if not has_token_activity:
-                            total_deposits += amount_sol
-                            logging.info(f"Found SOL deposit for {wallet}: {amount_sol} SOL from {from_account} at {tx_date}")
-                        else:
-                            logging.debug(f"Skipping SOL transfer for {wallet} (likely from token sale): {amount_sol} SOL")
-                            
-            except Exception as e:
-                logging.warning(f"Error processing transaction for {wallet}: {e}")
-                continue
-                
-        logging.info(f"Total SOL deposits for {wallet} since challenge start: {total_deposits}")
-        return total_deposits
-        
-    except Exception as e:
-        logging.warning(f"Failed to get transaction history for {wallet}: {e}")
-        return 0.0
+# def get_sol_deposits_since_start(wallet):
+#     """Check for SOL deposits (not from token sales) since challenge start"""
+#     url = f"https://api.helius.xyz/v0/addresses/{wallet}/transactions?api-key={HELIUS_API_KEY}&limit=100"
+#     try:
+#         response = requests.get(url)
+#         if response.status_code != 200:
+#             logging.warning(f"Failed to get transactions for {wallet}: {response.status_code}")
+#             return 0.0
+#             
+#         transactions = response.json()
+#         total_deposits = 0.0
+#         
+#         for tx in transactions:
+#             try:
+#                 # Skip if transaction is before challenge start
+#                 tx_timestamp = tx.get("timestamp", 0)
+#                 tx_date = datetime.fromtimestamp(tx_timestamp, tz=timezone.utc)
+#                 if tx_date < START_DATE:
+#                     continue
+#                 
+#                 # Check native transfers (SOL deposits)
+#                 native_transfers = tx.get("nativeTransfers", [])
+#                 for transfer in native_transfers:
+#                     # Check if this wallet received SOL
+#                     if transfer.get("toUserAccount") == wallet:
+#                         amount_sol = transfer.get("amount", 0) / 1_000_000_000
+#                         from_account = transfer.get("fromUserAccount")
+#                         
+#                         # Skip if it's from a DEX/program (likely token sale proceeds)
+#                         # Common DEX program addresses to exclude
+#                         dex_programs = [
+#                             "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",  # Jupiter
+#                             "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",  # Raydium
+#                             "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",  # Raydium AMM
+#                             "22Y43yTVxuUkoRKdm9thyRhQ3SdgQS7c7kB6UNCiaczD",  # Serum DEX
+#                         ]
+#                         
+#                         # Skip if from known DEX programs or system program
+#                         if from_account in dex_programs or from_account == "11111111111111111111111111111111":
+#                             continue
+#                             
+#                         # Check transaction type - skip if it involves token swaps
+#                         tx_type = tx.get("type")
+#                         if tx_type in ["SWAP", "DEX_TRADE"]:
+#                             continue
+#                             
+#                         # Check if there are token transfers in the same transaction (likely a swap)
+#                         token_transfers = tx.get("tokenTransfers", [])
+#                         has_token_activity = any(
+#                             t.get("toUserAccount") == wallet or t.get("fromUserAccount") == wallet 
+#                             for t in token_transfers
+#                         )
+#                         
+#                         if not has_token_activity:
+#                             total_deposits += amount_sol
+#                             logging.info(f"Found SOL deposit for {wallet}: {amount_sol} SOL from {from_account} at {tx_date}")
+#                         else:
+#                             logging.debug(f"Skipping SOL transfer for {wallet} (likely from token sale): {amount_sol} SOL")
+#                             
+#             except Exception as e:
+#                 logging.warning(f"Error processing transaction for {wallet}: {e}")
+#                 continue
+#                 
+#         logging.info(f"Total SOL deposits for {wallet} since challenge start: {total_deposits}")
+#         return total_deposits
+#         
+#     except Exception as e:
+#         logging.warning(f"Failed to get transaction history for {wallet}: {e}")
+#         return 0.0
 
 def get_token_transfers(wallet):
     # Updated Helius API endpoint and method
@@ -322,8 +322,8 @@ for entry in wallets:
 
     sol = get_sol_balance(wallet)
     
-    # Check for SOL deposits during challenge period
-    sol_deposits = get_sol_deposits_since_start(wallet) if not challenge_ended else 0.0
+    # Check for SOL deposits during challenge period - COMMENTED OUT
+    # sol_deposits = get_sol_deposits_since_start(wallet) if not challenge_ended else 0.0
     
     # Only update token values if challenge hasn't ended
     if not challenge_ended:
@@ -344,19 +344,19 @@ for entry in wallets:
                 last_data = json.load(f)
                 last_entry = next((item for item in last_data["data"] if item["wallet"] == wallet), None)
                 token_value = last_entry["tokens"] if last_entry else 0
-                sol_deposits = last_entry.get("sol_deposits", 0) if last_entry else 0
-                logging.info(f"Using frozen values for {wallet}: tokens={token_value}, deposits={sol_deposits}")
+                # sol_deposits = last_entry.get("sol_deposits", 0) if last_entry else 0
+                logging.info(f"Using frozen values for {wallet}: tokens={token_value}")
         except Exception as e:
             logging.warning(f"Could not load frozen values: {e}")
             token_value = 0
-            sol_deposits = 0
+            # sol_deposits = 0
 
     total = sol + token_value
     start = start_sols[wallet]
     change_pct = ((total - start) / start * 100) if start > 0 else 0
     
-    # Flag if user deposited SOL during challenge
-    has_deposits = sol_deposits > 0.001  # Threshold to ignore dust
+    # Flag if user deposited SOL during challenge - COMMENTED OUT
+    # has_deposits = sol_deposits > 0.001  # Threshold to ignore dust
 
     leaderboard.append({
         "username": username,
@@ -364,9 +364,9 @@ for entry in wallets:
         "sol": round(sol, 4),
         "tokens": round(token_value, 4),
         "total": round(total, 4),
-        "change_pct": round(change_pct, 2),
-        "sol_deposits": round(sol_deposits, 4),
-        "has_deposits": has_deposits
+        "change_pct": round(change_pct, 2)
+        # "sol_deposits": round(sol_deposits, 4),
+        # "has_deposits": has_deposits
     })
 
 leaderboard.sort(key=lambda x: x["total"], reverse=True)
@@ -375,8 +375,8 @@ leaderboard.sort(key=lambda x: x["total"], reverse=True)
 if challenge_ended and leaderboard:
     winner = leaderboard[0]
     logging.info(f"🏆 WINNER: {winner['username']} with {winner['total']} SOL ({winner['change_pct']:+.2f}%)")
-    if winner.get('has_deposits'):
-        logging.warning(f"⚠️  Winner {winner['username']} deposited {winner['sol_deposits']} SOL during challenge!")
+    # if winner.get('has_deposits'):
+    #     logging.warning(f"⚠️  Winner {winner['username']} deposited {winner['sol_deposits']} SOL during challenge!")
 
 output_data = {
     "updated": datetime.now(timezone.utc).isoformat(),
