@@ -118,33 +118,64 @@ function getSolPriceUsd() {
     return getTokenPrice("So11111111111111111111111111111111111111112");
 }
 
+// Enhanced logging function (same as in update.php)
+function logMessage($message, $level = 'INFO') {
+    $timestamp = date('Y-m-d H:i:s');
+    $logFile = __DIR__ . '/../logs/leaderboard.log';
+    
+    // Create logs directory if it doesn't exist
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+    
+    $logEntry = "[{$timestamp}] [{$level}] {$message}\n";
+    file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+    
+    // Also keep error_log for backward compatibility
+    error_log($message);
+}
+
 // Update leaderboard data
 function updateLeaderboard($configOverride = null) {
     global $CONFIG_FILE, $START_SOL_FILE, $DATA_FILE, $WINNER_POT_WALLET, $CHALLENGE_END_DATE;
     
+    logMessage("=== LEADERBOARD UPDATE START ===", 'INFO');
+    logMessage("updateLeaderboard() called with configOverride: " . ($configOverride ? 'YES' : 'NO'), 'DEBUG');
+    
     // Load config - priority: parameter > global > file
     if ($configOverride) {
         $config = $configOverride;
+        logMessage("Using config from parameter", 'DEBUG');
     } elseif (isset($GLOBALS['config'])) {
         $config = $GLOBALS['config'];
+        logMessage("Using config from GLOBALS", 'DEBUG');
     } else {
         // Fallback: load config directly
+        logMessage("Loading config directly from file", 'DEBUG');
         define('CONFIG_ACCESS', true);
         $config = require_once __DIR__ . '/../config/config.php';
     }
+    
+    // Debug: Log the entire config structure
+    logMessage("Config structure: " . print_r($config, true), 'DEBUG');
     
     // Load wallets and start SOL values
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
+    logMessage("Loaded " . count($wallets) . " wallets from config file", 'INFO');
+    logMessage("Loaded " . count($startSols) . " start SOL values", 'INFO');
+    
     // Get challenge end date from config
     $challengeEndDateRaw = $config['app']['challenge_end_date'] ?? null;
     
     // Debug logging
-    error_log("Raw Challenge End Date from config: " . ($challengeEndDateRaw ?? 'NULL'));
+    logMessage("Raw Challenge End Date from config: " . ($challengeEndDateRaw ?? 'NULL'), 'DEBUG');
+    logMessage("Config app section: " . print_r($config['app'] ?? 'NOT SET', true), 'DEBUG');
     
     if (!$challengeEndDateRaw) {
-        error_log("ERROR: challenge_end_date not found in config!");
+        logMessage("ERROR: challenge_end_date not found in config!", 'ERROR');
         $challengeEnded = false;
         $endDateTime = new DateTime();
         $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
@@ -156,12 +187,12 @@ function updateLeaderboard($configOverride = null) {
             $challengeEnded = $nowDateTime >= $endDateTime;
             
             // Debug logging
-            error_log("Challenge End Date: " . $challengeEndDateRaw);
-            error_log("Parsed End DateTime: " . $endDateTime->format('Y-m-d H:i:s T'));
-            error_log("Current DateTime: " . $nowDateTime->format('Y-m-d H:i:s T'));
-            error_log("Challenge Ended: " . ($challengeEnded ? 'YES' : 'NO'));
+            logMessage("Challenge End Date: " . $challengeEndDateRaw, 'DEBUG');
+            logMessage("Parsed End DateTime: " . $endDateTime->format('Y-m-d H:i:s T'), 'DEBUG');
+            logMessage("Current DateTime: " . $nowDateTime->format('Y-m-d H:i:s T'), 'DEBUG');
+            logMessage("Challenge Ended: " . ($challengeEnded ? 'YES' : 'NO'), 'INFO');
         } catch (Exception $e) {
-            error_log("ERROR parsing challenge_end_date: " . $e->getMessage());
+            logMessage("ERROR parsing challenge_end_date: " . $e->getMessage(), 'ERROR');
             $challengeEnded = false;
             $endDateTime = new DateTime();
             $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
@@ -170,30 +201,42 @@ function updateLeaderboard($configOverride = null) {
     
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
+    logMessage("Winner pot balance: " . $winnerPotBalance, 'INFO');
     
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
+    logMessage("SOL price USD: " . $solPriceUsd, 'INFO');
     
     foreach ($wallets as $entry) {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
         
+        logMessage("Processing wallet: " . $wallet . " (username: " . $username . ")", 'DEBUG');
+        
         if (!isset($startSols[$wallet])) {
+            logMessage("WARNING: No start SOL value for wallet " . $wallet, 'WARNING');
             continue;
         }
         
         $sol = getSolBalance($wallet);
         $tokenValue = 0;
         
+        logMessage("Wallet " . $wallet . " - SOL balance: " . $sol, 'DEBUG');
+        
         // Get swap data (placeholder for now)
         $swapData = getSwapHistory($wallet, $config['app']['challenge_start_date']);
+        logMessage("Swap data for " . $wallet . ": " . print_r($swapData, true), 'DEBUG');
         
         if (!$challengeEnded) {
             $tokens = getTokenBalances($wallet);
+            logMessage("Token balances for " . $wallet . ": " . print_r($tokens, true), 'DEBUG');
+            
             foreach ($tokens as $mint => $amount) {
                 $tokenPriceUsd = getTokenPrice($mint);
                 if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
-                    $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
+                    $tokenValueAdd = $amount * ($tokenPriceUsd / $solPriceUsd);
+                    $tokenValue += $tokenValueAdd;
+                    logMessage("Token " . $mint . ": amount=" . $amount . ", price_usd=" . $tokenPriceUsd . ", value_sol=" . $tokenValueAdd, 'DEBUG');
                 }
             }
         } else {
@@ -208,6 +251,7 @@ function updateLeaderboard($configOverride = null) {
                             'total_volume_sol' => $lastEntry['swap_volume'] ?? 0,
                             'avg_trade_size' => $lastEntry['avg_trade'] ?? 0
                         ];
+                        logMessage("Using frozen values for " . $wallet . " - tokens: " . $tokenValue, 'DEBUG');
                         break;
                     }
                 }
@@ -217,6 +261,8 @@ function updateLeaderboard($configOverride = null) {
         $total = $sol + $tokenValue;
         $start = $startSols[$wallet];
         $changePct = $start > 0 ? (($total - $start) / $start * 100) : 0;
+        
+        logMessage("Wallet " . $wallet . " final: SOL=" . $sol . ", tokens=" . $tokenValue . ", total=" . $total . ", start=" . $start . ", change=" . $changePct . "%", 'INFO');
         
         $leaderboard[] = [
             'username' => $username,
@@ -236,7 +282,9 @@ function updateLeaderboard($configOverride = null) {
         return $b['total'] <=> $a['total'];
     });
     
-    // Badge-Logik - FIX: Now that swap fields exist
+    logMessage("Leaderboard sorted, " . count($leaderboard) . " entries", 'INFO');
+    
+    // Badge-Logik
     $mostActiveTrader = 0;
     $volumeKing = 0;
     
@@ -248,6 +296,8 @@ function updateLeaderboard($configOverride = null) {
             $volumeKing = $entry['swap_volume'];
         }
     }
+    
+    logMessage("Badge thresholds - Most Active: " . $mostActiveTrader . ", Volume King: " . $volumeKing, 'DEBUG');
     
     // Badges zuweisen
     foreach ($leaderboard as &$entry) {
@@ -276,19 +326,20 @@ function updateLeaderboard($configOverride = null) {
     
     // Save to file
     file_put_contents($DATA_FILE, json_encode($outputData, JSON_PRETTY_PRINT));
+    logMessage("Data saved to file: " . $DATA_FILE, 'INFO');
     
+    logMessage("=== LEADERBOARD UPDATE END ===", 'INFO');
     return $outputData;
 }
 
-// Get Swap History
+// Get Swap History - Add logging
 function getSwapHistory($wallet, $startDate) {
     global $HELIUS_API_KEY;
     
-    $url = "https://api.helius.xyz/v0/addresses/{$wallet}/transactions?api-key={$HELIUS_API_KEY}";
-    // Filter für DEX-Transaktionen seit Challenge-Start
+    logMessage("getSwapHistory called for wallet: " . $wallet . ", startDate: " . $startDate, 'DEBUG');
     
-    // Parse Swap-Daten von Jupiter, Raydium, Orca etc.
-    return [
+    // For now, return placeholder data
+    $swapData = [
         'total_volume_sol' => 0,
         'swap_count' => 0,
         'avg_trade_size' => 0,
@@ -296,26 +347,33 @@ function getSwapHistory($wallet, $startDate) {
         'best_token_gain' => 0,
         'total_swap_pnl' => 0
     ];
+    
+    logMessage("Returning placeholder swap data: " . print_r($swapData, true), 'DEBUG');
+    return $swapData;
 }
 
 // Handle request
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    // No auth required anymore
+    logMessage("GET request received for leaderboard", 'INFO');
     
     // Return cached data if exists and is recent
     if (file_exists($DATA_FILE)) {
         $fileTime = filemtime($DATA_FILE);
         if (time() - $fileTime < $CACHE_TIMEOUT) {
+            logMessage("Returning cached data (age: " . (time() - $fileTime) . "s)", 'INFO');
             echo file_get_contents($DATA_FILE);
             exit;
         }
     }
     
     // Update and return new data
+    logMessage("Cache expired or missing, updating leaderboard", 'INFO');
     $data = updateLeaderboard();
     echo json_encode($data);
     
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    logMessage("POST request received for manual update", 'INFO');
+    
     // Keep auth for manual updates via POST
     checkAuth();
     
@@ -324,8 +382,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode(['message' => 'Update successful', 'data' => $data]);
     
 } else {
+    logMessage("Invalid request method: " . $_SERVER['REQUEST_METHOD'], 'WARNING');
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
+}
+
+// Log rotation for leaderboard.log (same as update.php)
+$logFile = __DIR__ . '/../logs/leaderboard.log';
+if (file_exists($logFile) && filesize($logFile) > 1024 * 1024) { // > 1MB
+    $lines = file($logFile);
+    if (count($lines) > 1000) {
+        $keepLines = array_slice($lines, -1000);
+        file_put_contents($logFile, implode('', $keepLines));
+        logMessage("Log file rotated, kept last 1000 lines", 'INFO');
+    }
 }
 
 // Auth check function (only used for POST requests now)
