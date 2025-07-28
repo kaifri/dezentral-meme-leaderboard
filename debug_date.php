@@ -1,6 +1,5 @@
 <?php
 // filepath: /debug_date.php
-<?php
 // Quick test script to debug date parsing
 
 define('CONFIG_ACCESS', true);
