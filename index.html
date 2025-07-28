@@ -3,12 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🏆 Solana Leaderboard</title>
+  <title>🏆 BfdA Solana Shitcoin Contest Leaderboard 🏆 </title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-10 px-4">
   <h1 class="text-4xl font-bold mb-4 text-yellow-400">🔥 Solana Leaderboard</h1>
+  
+  <!-- Challenge Status Banner -->
+  <div id="challenge-status" class="mb-4 px-4 py-2 rounded-lg text-center hidden">
+    <div id="challenge-active" class="bg-green-800 text-green-200 hidden">
+      🟢 Challenge läuft bis <span id="end-date"></span>
+    </div>
+    <div id="challenge-ended" class="bg-red-800 text-red-200 hidden">
+      🔴 Challenge beendet! Finale Ergebnisse
+    </div>
+  </div>
+
+  <!-- Winner Pot Display -->
+  <div id="winner-pot" class="mb-6 bg-gradient-to-r from-yellow-800 to-yellow-600 px-6 py-3 rounded-lg text-center hidden">
+    <div class="text-yellow-200 text-sm">🏆 Gewinner-Pot</div>
+    <div class="text-yellow-100 text-xl font-bold"><span id="pot-balance">0</span> SOL</div>
+    <div class="text-yellow-200 text-xs">Wallet: <span id="pot-wallet" class="font-mono"></span></div>
+  </div>
+
   <p class="mb-6 text-sm text-gray-400">Stand: <span id="last-updated">...</span></p>
+  
   <div class="w-full max-w-5xl overflow-x-auto">
     <table class="min-w-full bg-gray-800 shadow-md rounded-lg overflow-hidden">
       <thead class="bg-yellow-600 text-left">
@@ -25,6 +44,15 @@
       <tbody id="leaderboard-body"></tbody>
     </table>
   </div>
+
+  <!-- Winner Announcement -->
+  <div id="winner-announcement" class="mt-8 bg-gradient-to-r from-yellow-700 to-orange-600 px-8 py-6 rounded-xl text-center hidden">
+    <div class="text-2xl mb-2">🎉 Herzlichen Glückwunsch! 🎉</div>
+    <div class="text-xl text-yellow-200 mb-2">Gewinner: <span id="winner-name" class="font-bold"></span></div>
+    <div class="text-lg">Endstand: <span id="winner-total" class="font-bold"></span> SOL</div>
+    <div class="text-sm text-yellow-200 mt-2">Gewinn: <span id="winner-change" class="font-bold"></span>%</div>
+  </div>
+
   <script>
     function updateLeaderboard() {
       fetch("data/leaderboard.json")
@@ -32,22 +60,71 @@
         .then(json => {
           const tbody = document.getElementById("leaderboard-body");
           const updated = document.getElementById("last-updated");
-          updated.textContent = new Date(json.updated).toLocaleString();
+          const challengeStatus = document.getElementById("challenge-status");
+          const challengeActive = document.getElementById("challenge-active");
+          const challengeEnded = document.getElementById("challenge-ended");
+          const endDate = document.getElementById("end-date");
+          const winnerPot = document.getElementById("winner-pot");
+          const potBalance = document.getElementById("pot-balance");
+          const potWallet = document.getElementById("pot-wallet");
+          const winnerAnnouncement = document.getElementById("winner-announcement");
+          const winnerName = document.getElementById("winner-name");
+          const winnerTotal = document.getElementById("winner-total");
+          const winnerChange = document.getElementById("winner-change");
+
+          updated.textContent = new Date(json.updated).toLocaleString('de-DE');
           tbody.innerHTML = "";
+
+          // Update challenge status
+          challengeStatus.classList.remove("hidden");
+          if (json.challenge_ended) {
+            challengeActive.classList.add("hidden");
+            challengeEnded.classList.remove("hidden");
+          } else {
+            challengeActive.classList.remove("hidden");
+            challengeEnded.classList.add("hidden");
+            endDate.textContent = new Date(json.challenge_end_date).toLocaleString('de-DE');
+          }
+
+          // Update winner pot
+          if (json.winner_pot) {
+            winnerPot.classList.remove("hidden");
+            potBalance.textContent = json.winner_pot.balance;
+            potWallet.textContent = `${json.winner_pot.wallet.slice(0, 4)}...${json.winner_pot.wallet.slice(-4)}`;
+          }
+
+          // Show winner announcement if challenge ended
+          if (json.challenge_ended && json.data.length > 0) {
+            const winner = json.data[0];
+            winnerAnnouncement.classList.remove("hidden");
+            winnerName.textContent = winner.username;
+            winnerTotal.textContent = winner.total.toFixed(4);
+            winnerChange.textContent = winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2);
+          }
 
           json.data.forEach((entry, i) => {
             const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
             const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+            
+            // Special styling for winner
+            const isWinner = i === 0 && json.challenge_ended;
+            const rowClass = isWinner 
+              ? "bg-gradient-to-r from-yellow-700 to-yellow-600" 
+              : (i % 2 === 0 ? "bg-gray-700" : "bg-gray-800");
 
             const row = document.createElement("tr");
-            row.className = i % 2 === 0 ? "bg-gray-700" : "bg-gray-800";
+            row.className = rowClass;
             row.innerHTML = `
-              <td class="px-4 py-2">${i + 1}</td>
-              <td class="px-4 py-2">${entry.username}</td>
-              <td class="px-4 py-2 text-xs text-gray-300">${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}</td>
+              <td class="px-4 py-2">${isWinner ? '🏆' : i + 1}</td>
+              <td class="px-4 py-2 ${isWinner ? 'font-bold text-yellow-200' : ''}">${entry.username}</td>
+              <td class="px-4 py-2 text-xs text-gray-300">
+                <a href="https://solscan.io/account/${entry.wallet}" target="_blank" class="hover:text-blue-400">
+                  ${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}
+                </a>
+              </td>
               <td class="px-4 py-2 text-right">${entry.sol.toFixed(4)}</td>
               <td class="px-4 py-2 text-right text-green-400">${entry.tokens.toFixed(4)}</td>
-              <td class="px-4 py-2 text-right font-bold text-yellow-400">${entry.total.toFixed(4)}</td>
+              <td class="px-4 py-2 text-right font-bold ${isWinner ? 'text-yellow-200 text-lg' : 'text-yellow-400'}">${entry.total.toFixed(4)}</td>
               <td class="px-4 py-2 text-right font-mono ${changeColor}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
             `;
             tbody.appendChild(row);
@@ -58,6 +135,7 @@
           console.error("Fehler beim Laden der JSON-Datei:", err);
         });
     }
+    
     updateLeaderboard();
     setInterval(updateLeaderboard, 30000);
   </script>

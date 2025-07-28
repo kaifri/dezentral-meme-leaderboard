@@ -22,7 +22,7 @@ if not HELIUS_API_KEY:
     raise ValueError("HELIUS_API_KEY not found in environment variables. Please check your .env file.")
 
 # Enable debug logging to see API responses
-logging.basicConfig(level=logging.CRITICAL)
+logging.basicConfig(level=logging.INFO)
 
 def get_sol_balance(wallet):
     url = "https://api.mainnet-beta.solana.com"
@@ -37,7 +37,8 @@ def get_sol_balance(wallet):
         res = requests.post(url, headers=headers, json=body).json()
         lamports = res["result"]["value"]
         return lamports / 1_000_000_000
-    except:
+    except Exception as e:
+        logging.error(f"Failed to get SOL balance for {wallet}: {e}")
         return 0
 
 def get_token_transfers(wallet):
@@ -147,7 +148,7 @@ def get_sol_price_usd():
     # Try Jupiter first
     url = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC"
     try:
-        res = requests.get(url, timeout=5).json()
+        res = requests.get(url, timeout=10).json()
         price = float(res['data']['So11111111111111111111111111111111111111112']['price'])
         if price > 0:
             logging.info(f"Got SOL price from Jupiter: ${price}")
@@ -188,7 +189,7 @@ def get_token_prices_in_sol(mints, sol_price_usd):
             url = f"https://api.jup.ag/v4/price?ids={mint}&vsToken=So11111111111111111111111111111111111111112"
             for attempt in range(3):
                 try:
-                    res = requests.get(url, timeout=5).json()
+                    res = requests.get(url, timeout=10).json()
                     if "data" in res and mint in res["data"]:
                         price = float(res['data'][mint]['price'])
                         logging.info(f"Fetched price from Jupiter for {mint}: {price}")
@@ -213,26 +214,31 @@ def get_token_prices_in_sol(mints, sol_price_usd):
             prices[mint] = 0
     return prices
 
-# Lade Wallets
+# Load wallets
 with open(CONFIG) as f:
     wallets = json.load(f)
 
-# Lade festgelegte Startwerte
+# Load start balances
 try:
     with open(START_SOL_PATH, "r") as f:
         start_sols = json.load(f)
-except:
+except Exception as e:
+    logging.error(f"Failed to load start balances: {e}")
     start_sols = {}
 
 # Check if challenge has ended
 current_time = datetime.now(timezone.utc)
 challenge_ended = current_time >= CHALLENGE_END_DATE
 
+if challenge_ended:
+    logging.info("🏁 Challenge has ended! Using frozen token values.")
+else:
+    logging.info(f"⏳ Challenge is active until {CHALLENGE_END_DATE}")
+
 # Get winner pot balance
 winner_pot_balance = get_sol_balance(WINNER_POT_WALLET)
 
 leaderboard = []
-
 sol_price_usd = get_sol_price_usd()
 
 for entry in wallets:
@@ -240,7 +246,7 @@ for entry in wallets:
     username = entry.get("username", wallet[:6])
 
     if wallet not in start_sols:
-        print(f"[WARN] Missing start balance for wallet {wallet}. Skipping.")
+        logging.warning(f"Missing start balance for wallet {wallet}. Skipping.")
         continue
 
     sol = get_sol_balance(wallet)
@@ -264,7 +270,9 @@ for entry in wallets:
                 last_data = json.load(f)
                 last_entry = next((item for item in last_data["data"] if item["wallet"] == wallet), None)
                 token_value = last_entry["tokens"] if last_entry else 0
-        except:
+                logging.info(f"Using frozen token value for {wallet}: {token_value}")
+        except Exception as e:
+            logging.warning(f"Could not load frozen token values: {e}")
             token_value = 0
 
     total = sol + token_value
@@ -282,14 +290,23 @@ for entry in wallets:
 
 leaderboard.sort(key=lambda x: x["total"], reverse=True)
 
+# Log winner if challenge ended
+if challenge_ended and leaderboard:
+    winner = leaderboard[0]
+    logging.info(f"🏆 WINNER: {winner['username']} with {winner['total']} SOL ({winner['change_pct']:+.2f}%)")
+
+output_data = {
+    "updated": datetime.now(timezone.utc).isoformat(),
+    "data": leaderboard,
+    "winner_pot": {
+        "wallet": WINNER_POT_WALLET,
+        "balance": round(winner_pot_balance, 4)
+    },
+    "challenge_ended": challenge_ended,
+    "challenge_end_date": CHALLENGE_END_DATE.isoformat()
+}
+
 with open(OUTPUT, "w") as f:
-    json.dump({
-        "updated": datetime.now(timezone.utc).isoformat(),
-        "data": leaderboard,
-        "winner_pot": {
-            "wallet": WINNER_POT_WALLET,
-            "balance": round(winner_pot_balance, 4)
-        },
-        "challenge_ended": challenge_ended,
-        "challenge_end_date": CHALLENGE_END_DATE.isoformat()
-    }, f, indent=2)
+    json.dump(output_data, f, indent=2)
+
+logging.info(f"✅ Leaderboard updated. Challenge ended: {challenge_ended}")
