@@ -482,6 +482,10 @@ function analyzeDefiActivity($activity) {
     $txType = $activity['type'] ?? '';
     $description = $activity['description'] ?? '';
     $events = $activity['events'] ?? [];
+    $signature = $activity['signature'] ?? '';
+    
+    // Log each activity for debugging
+    logMessage("Analyzing activity: " . $signature . " - Type: " . $txType . " - Description: " . $description, 'DEBUG');
     
     // More comprehensive swap detection
     $swapPatterns = [
@@ -496,13 +500,19 @@ function analyzeDefiActivity($activity) {
         'swap',
         'exchange',
         'traded',
-        'swapped'
+        'swapped',
+        'buy',
+        'sell',
+        'purchase'
     ];
     
     $isSwap = false;
+    $matchedPattern = '';
+    
     foreach ($swapPatterns as $pattern) {
         if (stripos($description, $pattern) !== false || stripos($txType, $pattern) !== false) {
             $isSwap = true;
+            $matchedPattern = $pattern;
             break;
         }
     }
@@ -511,19 +521,51 @@ function analyzeDefiActivity($activity) {
     if (!$isSwap) {
         foreach ($events as $event) {
             $eventType = $event['type'] ?? '';
-            if (stripos($eventType, 'swap') !== false || stripos($eventType, 'trade') !== false) {
-                $isSwap = true;
-                break;
+            $eventDescription = $event['description'] ?? '';
+            
+            foreach ($swapPatterns as $pattern) {
+                if (stripos($eventType, $pattern) !== false || stripos($eventDescription, $pattern) !== false) {
+                    $isSwap = true;
+                    $matchedPattern = $pattern . ' (in events)';
+                    break 2;
+                }
             }
         }
     }
     
-    if (!$isSwap) {
+    // Additional check: if there are token balance changes, it might be a swap
+    $tokenBalanceChanges = $activity['tokenBalanceChanges'] ?? [];
+    if (!$isSwap && count($tokenBalanceChanges) >= 2) {
+        // If there are multiple token balance changes, it's likely a swap
+        $hasNegativeChange = false;
+        $hasPositiveChange = false;
+        
+        foreach ($tokenBalanceChanges as $change) {
+            $rawAmount = floatval($change['rawTokenAmount']['tokenAmount'] ?? 0);
+            if ($rawAmount < 0) $hasNegativeChange = true;
+            if ($rawAmount > 0) $hasPositiveChange = true;
+        }
+        
+        if ($hasNegativeChange && $hasPositiveChange) {
+            $isSwap = true;
+            $matchedPattern = 'token_balance_pattern';
+        }
+    }
+    
+    if ($isSwap) {
+        logMessage("SWAP DETECTED with pattern: " . $matchedPattern . " - " . $signature, 'DEBUG');
+    } else {
+        logMessage("NOT A SWAP: " . $signature . " - Available events: " . count($events), 'DEBUG');
+        // Log the first few events for debugging
+        if (!empty($events)) {
+            foreach (array_slice($events, 0, 3) as $i => $event) {
+                logMessage("Event " . $i . ": " . json_encode($event), 'DEBUG');
+            }
+        }
         return null;
     }
     
     // Extract swap details from token balance changes
-    $tokenBalanceChanges = $activity['tokenBalanceChanges'] ?? [];
     $nativeBalanceChange = floatval($activity['nativeBalanceChange'] ?? 0) / 1000000000; // Convert lamports to SOL
     
     $tokenIn = null;
@@ -532,12 +574,16 @@ function analyzeDefiActivity($activity) {
     $amountOut = 0;
     $volumeSol = 0;
     
+    logMessage("Token balance changes count: " . count($tokenBalanceChanges) . ", Native change: " . $nativeBalanceChange, 'DEBUG');
+    
     // Analyze token balance changes
     foreach ($tokenBalanceChanges as $change) {
         $mint = $change['mint'] ?? '';
         $rawAmount = floatval($change['rawTokenAmount']['tokenAmount'] ?? 0);
         $decimals = intval($change['rawTokenAmount']['decimals'] ?? 0);
-        $amount = $rawAmount / pow(10, $decimals);
+        $amount = $decimals > 0 ? $rawAmount / pow(10, $decimals) : $rawAmount;
+        
+        logMessage("Token change - Mint: " . substr($mint, 0, 8) . "..., Raw: " . $rawAmount . ", Decimals: " . $decimals . ", Amount: " . $amount, 'DEBUG');
         
         if ($rawAmount < 0) {
             // Token sold (negative change)
@@ -551,17 +597,24 @@ function analyzeDefiActivity($activity) {
     }
     
     // Calculate volume in SOL - improved logic
-    if (abs($nativeBalanceChange) > 0.001) { // Minimum threshold to avoid dust
+    if (abs($nativeBalanceChange) > 0.0001) { // Lower threshold
         $volumeSol = abs($nativeBalanceChange);
+        logMessage("Using native balance change for volume: " . $volumeSol, 'DEBUG');
     } else {
-        // Try to estimate volume from token amounts
-        // This is a simplified estimation - in reality you'd need token prices at transaction time
-        $estimatedVolume = max($amountIn * 0.0001, $amountOut * 0.0001); // Very rough estimation
-        $volumeSol = max($estimatedVolume, 0.001); // Minimum volume for counting
+        // For token-to-token swaps, estimate volume
+        // This is simplified - ideally we'd get historical prices
+        if ($amountIn > 0 || $amountOut > 0) {
+            $estimatedVolume = max($amountIn * 0.00001, $amountOut * 0.00001, 0.01); // More conservative estimation
+            $volumeSol = $estimatedVolume;
+            logMessage("Estimated volume from token amounts: " . $volumeSol, 'DEBUG');
+        } else {
+            $volumeSol = 0.01; // Default minimum volume for counting
+            logMessage("Using default minimum volume: " . $volumeSol, 'DEBUG');
+        }
     }
     
     return [
-        'signature' => $activity['signature'] ?? '',
+        'signature' => $signature,
         'timestamp' => $activity['timestamp'] ?? 0,
         'token_in' => $tokenIn,
         'token_out' => $tokenOut,
@@ -569,7 +622,8 @@ function analyzeDefiActivity($activity) {
         'amount_out' => $amountOut,
         'volume_sol' => $volumeSol,
         'description' => $description,
-        'type' => $txType
+        'type' => $txType,
+        'matched_pattern' => $matchedPattern
     ];
 }
 
