@@ -84,9 +84,6 @@ $frontend_config = [
           <th class="px-6 py-4 text-right font-bold text-yellow-900">Tokens</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">Total (SOL)</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">% Change</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Swaps</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Vol. (SOL)</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Avg Trade</th>
         </tr>
       </thead>
       <tbody id="leaderboard-body"></tbody>
@@ -162,15 +159,6 @@ $frontend_config = [
         cardClass = "bg-gradient-to-r from-orange-900 to-orange-800 border-l-4 border-orange-400 rounded-lg p-4 shadow-lg";
       }
 
-      // Badges für spezielle Achievements
-      let badges = '';
-      if (entry.most_active_trader) {
-        badges += '<span class="inline-block bg-blue-600 text-blue-100 text-xs px-2 py-1 rounded-full mr-1 mb-1">🔥 Most Active</span>';
-      }
-      if (entry.volume_king) {
-        badges += '<span class="inline-block bg-purple-600 text-purple-100 text-xs px-2 py-1 rounded-full mr-1 mb-1">👑 Volume King</span>';
-      }
-
       return `
         <div class="${cardClass}">
           <div class="flex items-center justify-between mb-3">
@@ -188,7 +176,6 @@ $frontend_config = [
               <div class="text-xs ${changeColor} font-mono">${changeText} ${(entry.change_pct || 0).toFixed(2)}%</div>
             </div>
           </div>
-          ${badges ? `<div class="mb-2">${badges}</div>` : ''}
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span class="text-gray-400">SOL:</span>
@@ -197,20 +184,6 @@ $frontend_config = [
             <div>
               <span class="text-gray-400">Tokens:</span>
               <span class="font-mono ml-1 text-green-400">${(entry.tokens || 0).toFixed(4)}</span>
-            </div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 text-xs mt-2">
-            <div>
-              <span class="text-gray-400">Swaps:</span>
-              <span class="font-mono ml-1">${entry.swap_count != null ? entry.swap_count : 0}</span>
-            </div>
-            <div>
-              <span class="text-gray-400">Volume:</span>
-              <span class="font-mono ml-1 text-blue-400">${entry.swap_volume != null ? entry.swap_volume.toFixed(2) : '0.00'}</span>
-            </div>
-            <div>
-              <span class="text-gray-400">Avg:</span>
-              <span class="font-mono ml-1">${entry.avg_trade != null ? entry.avg_trade.toFixed(3) : '0.000'}</span>
             </div>
           </div>
         </div>
@@ -313,22 +286,12 @@ $frontend_config = [
               rowClass += i % 2 === 0 ? " bg-gray-800" : " bg-gray-700";
             }
 
-            // Badges für Desktop
-            let badgeHtml = '';
-            if (entry.most_active_trader) {
-              badgeHtml += '<span class="inline-block bg-blue-600 text-blue-100 text-xs px-2 py-1 rounded-full mr-1">🔥 Most Active</span>';
-            }
-            if (entry.volume_king) {
-              badgeHtml += '<span class="inline-block bg-purple-600 text-purple-100 text-xs px-2 py-1 rounded-full mr-1">👑 Volume King</span>';
-            }
-
             const row = document.createElement("tr");
             row.className = rowClass;
             row.innerHTML = `
               <td class="px-6 py-4 font-bold text-lg ${rank <= 3 ? 'text-2xl' : ''}">${rankDisplay}</td>
               <td class="px-6 py-4 ${rank === 1 ? 'font-bold text-yellow-200 text-lg' : rank <= 3 ? 'font-semibold' : ''}">
                 <div>${entry.username || 'Unknown'}</div>
-                ${badgeHtml ? `<div class="mt-1">${badgeHtml}</div>` : ''}
               </td>
               <td class="px-6 py-4 text-sm text-gray-300">
                 <a href="https://solscan.io/account/${entry.wallet || ''}" target="_blank" class="hover:text-blue-400 transition-colors">
@@ -339,9 +302,6 @@ $frontend_config = [
               <td class="px-6 py-4 text-right text-green-400 font-mono">${(entry.tokens || 0).toFixed(4)}</td>
               <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${(entry.total || 0).toFixed(4)}</td>
               <td class="px-6 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${(entry.change_pct || 0).toFixed(2)}%</td>
-              <td class="px-6 py-4 text-right font-mono">${entry.swap_count != null ? entry.swap_count : 0}</td>
-              <td class="px-6 py-4 text-right font-mono">${entry.swap_volume != null ? entry.swap_volume.toFixed(2) : '0.00'}</td>
-              <td class="px-6 py-4 text-right font-mono">${entry.avg_trade != null ? entry.avg_trade.toFixed(3) : '0.000'}</td>
             `;
             tbody.appendChild(row);
 
@@ -365,7 +325,7 @@ $frontend_config = [
       if (lastUpdatedElement.dataset.lastUpdate) {
         lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
       }
-    }, 60000);
+    }, 30000);
   </script>
 
   <!-- Footer -->
@@ -384,7 +344,7 @@ $frontend_config = [
         <!-- Update Info -->
         <div class="text-center">
           <div class="flex items-center justify-center space-x-2 text-sm text-gray-400">
-            <span>Data updates every <?php echo $config['app']['update_interval_seconds']; ?>s • Page refreshes every 30sec</span>
+            <span>Data updates every <?php echo $config['app']['update_interval_seconds']; ?>s • Page refreshes every 60sec</span>
           </div>
         </div>
       </div>
