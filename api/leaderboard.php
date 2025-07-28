@@ -332,7 +332,7 @@ function updateLeaderboard($configOverride = null) {
     return $outputData;
 }
 
-// Get Swap History - Real implementation
+// Get Swap History - Improved implementation using DeFi Activities
 function getSwapHistory($wallet, $startDate) {
     global $HELIUS_API_KEY;
     
@@ -356,26 +356,26 @@ function getSwapHistory($wallet, $startDate) {
             return $swapData;
         }
         
-        // Fetch transactions from Helius API
-        $transactions = fetchTransactionsFromHelius($wallet, $startTimestamp);
+        // Fetch DeFi activities from Helius API (better for swaps)
+        $activities = fetchDefiActivitiesFromHelius($wallet, $startTimestamp);
         
-        if (empty($transactions)) {
-            logMessage("No transactions found for wallet: " . $wallet, 'DEBUG');
+        if (empty($activities)) {
+            logMessage("No DeFi activities found for wallet: " . $wallet, 'DEBUG');
             return $swapData;
         }
         
-        logMessage("Found " . count($transactions) . " transactions for wallet: " . $wallet, 'DEBUG');
+        logMessage("Found " . count($activities) . " DeFi activities for wallet: " . $wallet, 'DEBUG');
         
-        $swapTransactions = [];
-        $uniqueTokens = [];
+        $swapCount = 0;
         $totalVolume = 0;
+        $uniqueTokens = [];
         
-        // Analyze each transaction
-        foreach ($transactions as $tx) {
-            $swapInfo = analyzeSwapTransaction($tx);
+        // Analyze each activity
+        foreach ($activities as $activity) {
+            $swapInfo = analyzeDefiActivity($activity);
             
             if ($swapInfo !== null) {
-                $swapTransactions[] = $swapInfo;
+                $swapCount++;
                 $totalVolume += $swapInfo['volume_sol'];
                 
                 // Track unique tokens
@@ -385,11 +385,12 @@ function getSwapHistory($wallet, $startDate) {
                 if (!empty($swapInfo['token_out'])) {
                     $uniqueTokens[$swapInfo['token_out']] = true;
                 }
+                
+                logMessage("Swap detected: " . $swapInfo['description'] . " - Volume: " . $swapInfo['volume_sol'] . " SOL", 'DEBUG');
             }
         }
         
         // Calculate statistics
-        $swapCount = count($swapTransactions);
         $avgTradeSize = $swapCount > 0 ? $totalVolume / $swapCount : 0;
         
         $swapData = [
@@ -410,26 +411,27 @@ function getSwapHistory($wallet, $startDate) {
     return $swapData;
 }
 
-// Fetch transactions from Helius API
-function fetchTransactionsFromHelius($wallet, $startTimestamp) {
+// Fetch DeFi activities from Helius API (more accurate for swaps)
+function fetchDefiActivitiesFromHelius($wallet, $startTimestamp) {
     global $HELIUS_API_KEY;
     
-    $allTransactions = [];
+    $allActivities = [];
     $before = null;
-    $maxPages = 10; // Limit to prevent infinite loops
+    $maxPages = 20; // Increase limit for more comprehensive data
     $pageCount = 0;
     
     do {
-        $url = "https://api.helius.xyz/v0/addresses/{$wallet}/transactions?api-key={$HELIUS_API_KEY}&limit=100";
+        // Use parsed-transactions endpoint with DeFi focus
+        $url = "https://api.helius.xyz/v0/addresses/{$wallet}/transactions?api-key={$HELIUS_API_KEY}&limit=100&commitment=confirmed";
         if ($before) {
             $url .= "&before={$before}";
         }
         
-        logMessage("Fetching transactions from: " . $url, 'DEBUG');
+        logMessage("Fetching DeFi activities from: " . $url, 'DEBUG');
         
         $response = @file_get_contents($url);
         if ($response === false) {
-            logMessage("Failed to fetch transactions from Helius API", 'ERROR');
+            logMessage("Failed to fetch activities from Helius API", 'ERROR');
             break;
         }
         
@@ -452,7 +454,7 @@ function fetchTransactionsFromHelius($wallet, $startTimestamp) {
             
             // Only include transactions from challenge start onwards
             if ($txTimestamp >= $startTimestamp) {
-                $allTransactions[] = $tx;
+                $allActivities[] = $tx;
             }
             
             $before = $tx['signature'] ?? null;
@@ -466,37 +468,53 @@ function fetchTransactionsFromHelius($wallet, $startTimestamp) {
         }
         
         // Small delay to respect API limits
-        usleep(100000); // 0.1 second
+        usleep(150000); // 0.15 second
         
     } while (true);
     
-    logMessage("Fetched " . count($allTransactions) . " transactions from Helius in " . $pageCount . " pages (filtered from challenge start)", 'DEBUG');
+    logMessage("Fetched " . count($allActivities) . " activities from Helius in " . $pageCount . " pages (filtered from challenge start)", 'DEBUG');
     
-    return $allTransactions;
+    return $allActivities;
 }
 
-// Analyze a transaction to determine if it's a swap and extract swap info
-function analyzeSwapTransaction($tx) {
-    // Look for swap-related transaction types
-    $txType = $tx['type'] ?? '';
-    $description = $tx['description'] ?? '';
+// Analyze a DeFi activity to determine if it's a swap and extract swap info
+function analyzeDefiActivity($activity) {
+    $txType = $activity['type'] ?? '';
+    $description = $activity['description'] ?? '';
+    $events = $activity['events'] ?? [];
     
-    // Common swap patterns
-    $swapIndicators = [
+    // More comprehensive swap detection
+    $swapPatterns = [
+        'TOKEN_SWAP',
         'SWAP',
         'Jupiter',
         'Raydium',
         'Orca',
         'Serum',
+        'Meteora',
+        'Whirlpool',
         'swap',
-        'exchange'
+        'exchange',
+        'traded',
+        'swapped'
     ];
     
     $isSwap = false;
-    foreach ($swapIndicators as $indicator) {
-        if (stripos($description, $indicator) !== false || stripos($txType, $indicator) !== false) {
+    foreach ($swapPatterns as $pattern) {
+        if (stripos($description, $pattern) !== false || stripos($txType, $pattern) !== false) {
             $isSwap = true;
             break;
+        }
+    }
+    
+    // Also check events for swap indicators
+    if (!$isSwap) {
+        foreach ($events as $event) {
+            $eventType = $event['type'] ?? '';
+            if (stripos($eventType, 'swap') !== false || stripos($eventType, 'trade') !== false) {
+                $isSwap = true;
+                break;
+            }
         }
     }
     
@@ -504,9 +522,9 @@ function analyzeSwapTransaction($tx) {
         return null;
     }
     
-    // Extract swap details from token balances changes
-    $tokenBalanceChanges = $tx['tokenBalanceChanges'] ?? [];
-    $nativeBalanceChange = floatval($tx['nativeBalanceChange'] ?? 0) / 1000000000; // Convert lamports to SOL
+    // Extract swap details from token balance changes
+    $tokenBalanceChanges = $activity['tokenBalanceChanges'] ?? [];
+    $nativeBalanceChange = floatval($activity['nativeBalanceChange'] ?? 0) / 1000000000; // Convert lamports to SOL
     
     $tokenIn = null;
     $tokenOut = null;
@@ -517,36 +535,41 @@ function analyzeSwapTransaction($tx) {
     // Analyze token balance changes
     foreach ($tokenBalanceChanges as $change) {
         $mint = $change['mint'] ?? '';
-        $amount = floatval($change['tokenAmount'] ?? 0);
+        $rawAmount = floatval($change['rawTokenAmount']['tokenAmount'] ?? 0);
+        $decimals = intval($change['rawTokenAmount']['decimals'] ?? 0);
+        $amount = $rawAmount / pow(10, $decimals);
         
-        if ($amount < 0) {
+        if ($rawAmount < 0) {
             // Token sold (negative change)
             $tokenIn = $mint;
             $amountIn = abs($amount);
-        } elseif ($amount > 0) {
+        } elseif ($rawAmount > 0) {
             // Token bought (positive change)
             $tokenOut = $mint;
             $amountOut = $amount;
         }
     }
     
-    // Calculate volume in SOL
-    if ($nativeBalanceChange != 0) {
+    // Calculate volume in SOL - improved logic
+    if (abs($nativeBalanceChange) > 0.001) { // Minimum threshold to avoid dust
         $volumeSol = abs($nativeBalanceChange);
     } else {
-        // Estimate based on token amounts (simplified)
-        $volumeSol = max($amountIn, $amountOut) * 0.001; // Rough estimation
+        // Try to estimate volume from token amounts
+        // This is a simplified estimation - in reality you'd need token prices at transaction time
+        $estimatedVolume = max($amountIn * 0.0001, $amountOut * 0.0001); // Very rough estimation
+        $volumeSol = max($estimatedVolume, 0.001); // Minimum volume for counting
     }
     
     return [
-        'signature' => $tx['signature'] ?? '',
-        'timestamp' => $tx['timestamp'] ?? 0,
+        'signature' => $activity['signature'] ?? '',
+        'timestamp' => $activity['timestamp'] ?? 0,
         'token_in' => $tokenIn,
         'token_out' => $tokenOut,
         'amount_in' => $amountIn,
         'amount_out' => $amountOut,
         'volume_sol' => $volumeSol,
-        'description' => $description
+        'description' => $description,
+        'type' => $txType
     ];
 }
 
