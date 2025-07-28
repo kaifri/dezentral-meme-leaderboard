@@ -84,35 +84,112 @@ function getTokenBalances($wallet) {
 
 // Get token price from Dexscreener
 function getTokenPrice($mint) {
-    $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
-    $response = @file_get_contents($url);
+    logMessage("Getting price for token: " . substr($mint, 0, 12) . "...", 'DEBUG');
     
-    if ($response === false) return 0;
-    
-    $data = json_decode($response, true);
-    $pairs = $data['pairs'] ?? [];
-    
-    if (empty($pairs)) return 0;
-    
-    // Sort by liquidity
-    usort($pairs, function($a, $b) {
-        $liqA = floatval($a['liquidity']['usd'] ?? 0);
-        $liqB = floatval($b['liquidity']['usd'] ?? 0);
-        return $liqB <=> $liqA;
-    });
-    
-    foreach ($pairs as $pair) {
-        $baseToken = $pair['baseToken']['address'] ?? '';
-        $quoteToken = $pair['quoteToken']['address'] ?? '';
-        $priceUsd = floatval($pair['priceUsd'] ?? 0);
-        
-        if ($baseToken === $mint && $priceUsd > 0) {
-            return $priceUsd;
-        } elseif ($quoteToken === $mint && $priceUsd > 0) {
-            return 1 / $priceUsd;
+    // First check if there's a manual override
+    $overridesFile = __DIR__ . '/../config/token_price_overrides.json';
+    if (file_exists($overridesFile)) {
+        $overrides = json_decode(file_get_contents($overridesFile), true);
+        if (isset($overrides[$mint])) {
+            $override = $overrides[$mint];
+            if (time() - $override['timestamp'] < 3600) { // Valid for 1 hour
+                logMessage("Using manual price override for " . substr($mint, 0, 12) . 
+                          ": " . $override['price_sol'] . " SOL", 'INFO');
+                return $override['price_sol'];
+            }
         }
     }
     
+    // Skip known stable coins to improve performance
+    if ($mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") { // USDC
+        return 1 / getSolPriceUsd(); // Convert USD to SOL
+    }
+    
+    // 1. Try Dexscreener with special handling for new tokens
+    $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
+    $response = @file_get_contents($url);
+    
+    if ($response !== false) {
+        $data = json_decode($response, true);
+        $pairs = $data['pairs'] ?? [];
+        
+        if (!empty($pairs)) {
+            // Sort by created timestamp (newest first) for new tokens, then by liquidity
+            usort($pairs, function($a, $b) {
+                // Compare creation time first - new tokens should prioritize newest pairs
+                $createdAtA = strtotime($a['createdAt'] ?? '');
+                $createdAtB = strtotime($b['createdAt'] ?? '');
+                if (abs($createdAtA - $createdAtB) > 86400) { // If more than a day difference
+                    return $createdAtB <=> $createdAtA; // Newer first
+                }
+                
+                // Then compare by liquidity
+                $liqA = floatval($a['liquidity']['usd'] ?? 0);
+                $liqB = floatval($b['liquidity']['usd'] ?? 0);
+                return $liqB <=> $liqA;
+            });
+            
+            // Log pair info for debugging
+            foreach ($pairs as $index => $pair) {
+                logMessage("Pair #{$index}: " . 
+                           ($pair['baseToken']['symbol'] ?? '?') . "/" . 
+                           ($pair['quoteToken']['symbol'] ?? '?') . 
+                           " - Liq: $" . ($pair['liquidity']['usd'] ?? 0) . 
+                           ", Created: " . ($pair['createdAt'] ?? 'unknown'), 'DEBUG');
+            }
+            
+            // First try SOL pairs directly - most accurate for new tokens
+            foreach ($pairs as $pair) {
+                $baseToken = $pair['baseToken']['address'] ?? '';
+                $quoteToken = $pair['quoteToken']['address'] ?? '';
+                
+                // Direct SOL pricing - most reliable for new tokens
+                if ($quoteToken === "So11111111111111111111111111111111111111112" && $baseToken === $mint) {
+                    $priceInSol = floatval($pair['priceNative'] ?? 0);
+                    if ($priceInSol > 0) {
+                        logMessage("Found direct SOL pair price: " . $priceInSol . 
+                                  " (Created: " . ($pair['createdAt'] ?? 'unknown') . ")", 'DEBUG');
+                        return $priceInSol;
+                    }
+                }
+                
+                // Reverse SOL pair
+                if ($baseToken === "So11111111111111111111111111111111111111112" && $quoteToken === $mint) {
+                    $priceInSol = 1 / floatval($pair['priceNative'] ?? 0);
+                    if ($priceInSol > 0 && is_finite($priceInSol)) {
+                        logMessage("Found inverse SOL pair price: " . $priceInSol, 'DEBUG');
+                        return $priceInSol;
+                    }
+                }
+            }
+            
+            // Then try USD pairs
+            foreach ($pairs as $pair) {
+                $baseToken = $pair['baseToken']['address'] ?? '';
+                $quoteToken = $pair['quoteToken']['address'] ?? '';
+                $priceUsd = floatval($pair['priceUsd'] ?? 0);
+                
+                if ($baseToken === $mint && $priceUsd > 0) {
+                    $solPriceUsd = getSolPriceUsd();
+                    if ($solPriceUsd > 0) {
+                        $priceInSol = $priceUsd / $solPriceUsd;
+                        logMessage("Found USD price from Dexscreener: $" . $priceUsd . 
+                                  " → " . $priceInSol . " SOL", 'DEBUG');
+                        return $priceInSol;
+                    }
+                }
+            }
+        } else {
+            logMessage("No pairs found on Dexscreener for: " . substr($mint, 0, 12), 'DEBUG');
+        }
+    }
+    
+    // 2. Add Birdeye API for new tokens (requires API key)
+    // Birdeye often indexes new tokens faster than other platforms
+    // $birdeyeUrl = "https://api.birdeye.so/v2/tokens/price?address={$mint}";
+    // Implement Birdeye API if you have access
+    
+    logMessage("No price found for token: " . substr($mint, 0, 12) . "...", 'WARNING');
     return 0;
 }
 
@@ -167,28 +244,33 @@ function checkAuth() {
 }
 
 // Update leaderboard data - only called by update.php, not automatically on web requests
-function updateLeaderboard($configOverride = null) {
+function updateLeaderboard($configInput = null) {
     global $CONFIG_FILE, $START_SOL_FILE, $DATA_FILE, $WINNER_POT_WALLET;
     
     logMessage("Starting leaderboard update...", 'INFO');
     
     // Load config - priority: parameter > global > file
-    if ($configOverride) {
-        $config = $configOverride;
+    if ($configInput) {
+        $configToUse = $configInput; // Renamed to avoid shadowing
     } elseif (isset($GLOBALS['config'])) {
-        $config = $GLOBALS['config'];
+        $configToUse = $GLOBALS['config'];
     } else {
         // Fallback: load config directly
         define('CONFIG_ACCESS', true);
-        $config = require_once __DIR__ . '/../config/config.php';
+        $configToUse = require_once __DIR__ . '/../config/config.php';
     }
+    
+    // Debug the config we're actually using
+    logMessage("Config structure: " . (isset($configToUse['app']['challenge_end_date']) ? 
+        "Has challenge_end_date: " . $configToUse['app']['challenge_end_date'] : 
+        "Missing challenge_end_date"), 'DEBUG');
     
     // Load wallets and start SOL values
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
     // Get challenge end date from config
-    $challengeEndDateRaw = $config['app']['challenge_end_date'] ?? null;
+    $challengeEndDateRaw = $configToUse['app']['challenge_end_date'] ?? null;
     
     // Debug logging
     logMessage("Raw Challenge End Date from config: " . ($challengeEndDateRaw ?? 'NULL'), 'DEBUG');
@@ -223,6 +305,7 @@ function updateLeaderboard($configOverride = null) {
     
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
+    logMessage("SOL price in USD: " . $solPriceUsd, 'DEBUG');
     
     foreach ($wallets as $entry) {
         $wallet = $entry['wallet'];
@@ -241,9 +324,24 @@ function updateLeaderboard($configOverride = null) {
         if (!$challengeEnded) {
             $tokens = getTokenBalances($wallet);
             foreach ($tokens as $mint => $amount) {
-                $tokenPriceUsd = getTokenPrice($mint);
-                if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
-                    $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
+                // Try direct SOL-based price first (value already in SOL)
+                $tokenPriceInSol = getTokenPrice($mint);
+                
+                if ($tokenPriceInSol > 0) {
+                    $oldValue = $tokenValue;
+                    $tokenValue += $amount * $tokenPriceInSol;
+                    logMessage("Token " . substr($mint, 0, 8) . "... value: " . 
+                               $amount . " × " . $tokenPriceInSol . " = " . 
+                               ($amount * $tokenPriceInSol) . " SOL", 'DEBUG');
+                } else {
+                    // Fallback to USD price divided by SOL price
+                    $tokenPriceUsd = getTokenPrice($mint);
+                    if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
+                        $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
+                        logMessage("Token " . substr($mint, 0, 8) . "... value via USD: " . 
+                                   $amount . " × (" . $tokenPriceUsd . " / " . $solPriceUsd . ") = " . 
+                                   ($amount * ($tokenPriceUsd / $solPriceUsd)) . " SOL", 'DEBUG');
+                    }
                 }
             }
         } else {

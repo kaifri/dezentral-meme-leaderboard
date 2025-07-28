@@ -94,6 +94,9 @@ try {
             cronLogMessage("Current leader: {$leader['username']} with {$leader['total']} SOL ({$leader['change_pct']}%)", 'INFO');
         }
         
+        // After calling updateLeaderboard
+        cronLogMessage("✅ Leaderboard update completed and logged to leaderboard.log", 'INFO');
+        
     } else {
         cronLogMessage("❌ Update failed - updateLeaderboard() returned null/false", 'ERROR');
     }
