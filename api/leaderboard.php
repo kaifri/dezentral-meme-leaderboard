@@ -5,15 +5,26 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Load secure configuration
-define('CONFIG_ACCESS', true);
+// Load secure configuration only if not already defined
+if (!defined('CONFIG_ACCESS')) {
+    define('CONFIG_ACCESS', true);
+}
+
 $config = require_once __DIR__ . '/../config/config.php';
 
-// Extract configuration values
-$HELIUS_API_KEY = $config['api']['helius_api_key'];
-$WINNER_POT_WALLET = $config['api']['winner_pot_wallet'];
-$CHALLENGE_END_DATE = $config['app']['challenge_end_date'];
-$CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'];
+// Check if config loaded properly
+if ($config === false || !is_array($config)) {
+    error_log("Failed to load config file");
+    http_response_code(500);
+    echo json_encode(['error' => 'Configuration error']);
+    exit;
+}
+
+// Extract configuration values with fallbacks
+$HELIUS_API_KEY = $config['api']['helius_api_key'] ?? '';
+$WINNER_POT_WALLET = $config['api']['winner_pot_wallet'] ?? '';
+$CHALLENGE_END_DATE = $config['app']['challenge_end_date'] ?? '';
+$CACHE_TIMEOUT = $config['app']['cache_timeout_seconds'] ?? 30;
 
 // File paths
 $CONFIG_FILE = __DIR__ . '/../config/wallets.json';
