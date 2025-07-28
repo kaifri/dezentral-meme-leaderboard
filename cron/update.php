@@ -54,11 +54,14 @@ try {
     $configuredEndDate = $config['app']['challenge_end_date'] ?? 'NOT SET';
     logMessage("DEBUG - Configured challenge_end_date from config: {$configuredEndDate}", 'DEBUG');
     
+    // Make config globally available for leaderboard.php
+    $GLOBALS['config'] = $config;
+    
     // Measure execution time
     $startTime = microtime(true);
     
-    // Call the update function
-    $data = updateLeaderboard();
+    // Call the update function with config
+    $data = updateLeaderboard($config);
     
     $endTime = microtime(true);
     $executionTime = round(($endTime - $startTime) * 1000, 2); // in milliseconds
