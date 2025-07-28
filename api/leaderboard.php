@@ -349,10 +349,13 @@ function getSwapHistory($wallet, $startDate) {
     ];
     
     try {
-        // Convert start date to timestamp
-        $startTimestamp = strtotime($startDate);
-        if ($startTimestamp === false) {
-            logMessage("Invalid start date format: " . $startDate, 'ERROR');
+        // Convert start date to timestamp - fix for ISO 8601 format
+        try {
+            $startDateTime = new DateTime($startDate);
+            $startTimestamp = $startDateTime->getTimestamp();
+            logMessage("Converted start date: " . $startDate . " to timestamp: " . $startTimestamp . " (" . date('Y-m-d H:i:s', $startTimestamp) . ")", 'DEBUG');
+        } catch (Exception $e) {
+            logMessage("Error parsing start date: " . $e->getMessage(), 'ERROR');
             return $swapData;
         }
         
@@ -369,24 +372,45 @@ function getSwapHistory($wallet, $startDate) {
         $swapCount = 0;
         $totalVolume = 0;
         $uniqueTokens = [];
+        $processedSwaps = []; // Track processed swaps to avoid duplicates
         
         // Analyze each activity
         foreach ($activities as $activity) {
             $swapInfo = analyzeDefiActivity($activity);
             
             if ($swapInfo !== null) {
-                $swapCount++;
-                $totalVolume += $swapInfo['volume_sol'];
+                // Create a unique key for this swap to detect duplicates
+                $swapKey = createSwapDeduplicationKey($swapInfo);
                 
-                // Track unique tokens
-                if (!empty($swapInfo['token_in'])) {
-                    $uniqueTokens[$swapInfo['token_in']] = true;
-                }
-                if (!empty($swapInfo['token_out'])) {
-                    $uniqueTokens[$swapInfo['token_out']] = true;
+                // Check if we've already processed a similar swap recently
+                $isDuplicate = false;
+                foreach ($processedSwaps as $processedKey => $processedTime) {
+                    // If same token pair within 5 minutes, consider it duplicate
+                    if ($swapKey === $processedKey && 
+                        abs($swapInfo['timestamp'] - $processedTime) < 300) {
+                        $isDuplicate = true;
+                        logMessage("🔄 DUPLICATE SWAP DETECTED: " . $swapInfo['signature'] . " (similar to recent swap)", 'DEBUG');
+                        break;
+                    }
                 }
                 
-                logMessage("Swap detected: " . $swapInfo['description'] . " - Volume: " . $swapInfo['volume_sol'] . " SOL", 'DEBUG');
+                if (!$isDuplicate) {
+                    $swapCount++;
+                    $totalVolume += $swapInfo['volume_sol'];
+                    
+                    // Track unique tokens
+                    if (!empty($swapInfo['token_in'])) {
+                        $uniqueTokens[$swapInfo['token_in']] = true;
+                    }
+                    if (!empty($swapInfo['token_out'])) {
+                        $uniqueTokens[$swapInfo['token_out']] = true;
+                    }
+                    
+                    // Record this swap to prevent future duplicates
+                    $processedSwaps[$swapKey] = $swapInfo['timestamp'];
+                    
+                    logMessage("✅ UNIQUE SWAP FOUND: " . $swapInfo['description'] . " - Volume: " . $swapInfo['volume_sol'] . " SOL", 'INFO');
+                }
             }
         }
         
@@ -402,13 +426,25 @@ function getSwapHistory($wallet, $startDate) {
             'total_swap_pnl' => 0   // TODO: Implement PnL calculation
         ];
         
-        logMessage("Swap analysis complete for " . $wallet . ": " . json_encode($swapData), 'DEBUG');
+        logMessage("🏁 FINAL SWAP STATS for " . substr($wallet, 0, 8) . "...: " . json_encode($swapData), 'INFO');
         
     } catch (Exception $e) {
         logMessage("Error in getSwapHistory for " . $wallet . ": " . $e->getMessage(), 'ERROR');
     }
     
     return $swapData;
+}
+
+// Create a unique key for swap deduplication
+function createSwapDeduplicationKey($swapInfo) {
+    $tokenIn = $swapInfo['token_in'] ?? '';
+    $tokenOut = $swapInfo['token_out'] ?? '';
+    
+    // Create a normalized key that treats A->B and B->A as the same pair
+    $tokens = [$tokenIn, $tokenOut];
+    sort($tokens); // Sort to normalize A->B vs B->A
+    
+    return implode('|', array_filter($tokens)); // Filter out empty tokens
 }
 
 // Fetch DeFi activities from Helius API (more accurate for swaps)
