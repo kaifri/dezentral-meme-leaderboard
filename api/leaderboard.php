@@ -332,13 +332,13 @@ function updateLeaderboard($configOverride = null) {
     return $outputData;
 }
 
-// Get Swap History - Add logging
+// Get Swap History - Real implementation
 function getSwapHistory($wallet, $startDate) {
     global $HELIUS_API_KEY;
     
     logMessage("getSwapHistory called for wallet: " . $wallet . ", startDate: " . $startDate, 'DEBUG');
     
-    // For now, return placeholder data
+    // Initialize swap data
     $swapData = [
         'total_volume_sol' => 0,
         'swap_count' => 0,
@@ -348,8 +348,202 @@ function getSwapHistory($wallet, $startDate) {
         'total_swap_pnl' => 0
     ];
     
-    logMessage("Returning placeholder swap data: " . print_r($swapData, true), 'DEBUG');
+    try {
+        // Convert start date to timestamp
+        $startTimestamp = strtotime($startDate);
+        if ($startTimestamp === false) {
+            logMessage("Invalid start date format: " . $startDate, 'ERROR');
+            return $swapData;
+        }
+        
+        // Fetch transactions from Helius API
+        $transactions = fetchTransactionsFromHelius($wallet, $startTimestamp);
+        
+        if (empty($transactions)) {
+            logMessage("No transactions found for wallet: " . $wallet, 'DEBUG');
+            return $swapData;
+        }
+        
+        logMessage("Found " . count($transactions) . " transactions for wallet: " . $wallet, 'DEBUG');
+        
+        $swapTransactions = [];
+        $uniqueTokens = [];
+        $totalVolume = 0;
+        
+        // Analyze each transaction
+        foreach ($transactions as $tx) {
+            $swapInfo = analyzeSwapTransaction($tx);
+            
+            if ($swapInfo !== null) {
+                $swapTransactions[] = $swapInfo;
+                $totalVolume += $swapInfo['volume_sol'];
+                
+                // Track unique tokens
+                if (!empty($swapInfo['token_in'])) {
+                    $uniqueTokens[$swapInfo['token_in']] = true;
+                }
+                if (!empty($swapInfo['token_out'])) {
+                    $uniqueTokens[$swapInfo['token_out']] = true;
+                }
+            }
+        }
+        
+        // Calculate statistics
+        $swapCount = count($swapTransactions);
+        $avgTradeSize = $swapCount > 0 ? $totalVolume / $swapCount : 0;
+        
+        $swapData = [
+            'total_volume_sol' => round($totalVolume, 6),
+            'swap_count' => $swapCount,
+            'avg_trade_size' => round($avgTradeSize, 6),
+            'unique_tokens' => count($uniqueTokens),
+            'best_token_gain' => 0, // TODO: Implement PnL calculation
+            'total_swap_pnl' => 0   // TODO: Implement PnL calculation
+        ];
+        
+        logMessage("Swap analysis complete for " . $wallet . ": " . json_encode($swapData), 'DEBUG');
+        
+    } catch (Exception $e) {
+        logMessage("Error in getSwapHistory for " . $wallet . ": " . $e->getMessage(), 'ERROR');
+    }
+    
     return $swapData;
+}
+
+// Fetch transactions from Helius API
+function fetchTransactionsFromHelius($wallet, $startTimestamp) {
+    global $HELIUS_API_KEY;
+    
+    $allTransactions = [];
+    $before = null;
+    $maxPages = 10; // Limit to prevent infinite loops
+    $pageCount = 0;
+    
+    do {
+        $url = "https://api.helius.xyz/v0/addresses/{$wallet}/transactions?api-key={$HELIUS_API_KEY}&limit=100";
+        if ($before) {
+            $url .= "&before={$before}";
+        }
+        
+        logMessage("Fetching transactions from: " . $url, 'DEBUG');
+        
+        $response = @file_get_contents($url);
+        if ($response === false) {
+            logMessage("Failed to fetch transactions from Helius API", 'ERROR');
+            break;
+        }
+        
+        $data = json_decode($response, true);
+        if (!isset($data) || !is_array($data)) {
+            logMessage("Invalid response from Helius API", 'ERROR');
+            break;
+        }
+        
+        $foundOlderTx = false;
+        
+        foreach ($data as $tx) {
+            $txTimestamp = $tx['timestamp'] ?? 0;
+            
+            // Stop if we've gone past our start date
+            if ($txTimestamp < $startTimestamp) {
+                $foundOlderTx = true;
+                break;
+            }
+            
+            $allTransactions[] = $tx;
+            $before = $tx['signature'] ?? null;
+        }
+        
+        $pageCount++;
+        
+        // Stop conditions
+        if ($foundOlderTx || empty($data) || count($data) < 100 || $pageCount >= $maxPages) {
+            break;
+        }
+        
+        // Small delay to respect API limits
+        usleep(100000); // 0.1 second
+        
+    } while (true);
+    
+    logMessage("Fetched " . count($allTransactions) . " transactions from Helius in " . $pageCount . " pages", 'DEBUG');
+    
+    return $allTransactions;
+}
+
+// Analyze a transaction to determine if it's a swap and extract swap info
+function analyzeSwapTransaction($tx) {
+    // Look for swap-related transaction types
+    $txType = $tx['type'] ?? '';
+    $description = $tx['description'] ?? '';
+    
+    // Common swap patterns
+    $swapIndicators = [
+        'SWAP',
+        'Jupiter',
+        'Raydium',
+        'Orca',
+        'Serum',
+        'swap',
+        'exchange'
+    ];
+    
+    $isSwap = false;
+    foreach ($swapIndicators as $indicator) {
+        if (stripos($description, $indicator) !== false || stripos($txType, $indicator) !== false) {
+            $isSwap = true;
+            break;
+        }
+    }
+    
+    if (!$isSwap) {
+        return null;
+    }
+    
+    // Extract swap details from token balances changes
+    $tokenBalanceChanges = $tx['tokenBalanceChanges'] ?? [];
+    $nativeBalanceChange = floatval($tx['nativeBalanceChange'] ?? 0) / 1000000000; // Convert lamports to SOL
+    
+    $tokenIn = null;
+    $tokenOut = null;
+    $amountIn = 0;
+    $amountOut = 0;
+    $volumeSol = 0;
+    
+    // Analyze token balance changes
+    foreach ($tokenBalanceChanges as $change) {
+        $mint = $change['mint'] ?? '';
+        $amount = floatval($change['tokenAmount'] ?? 0);
+        
+        if ($amount < 0) {
+            // Token sold (negative change)
+            $tokenIn = $mint;
+            $amountIn = abs($amount);
+        } elseif ($amount > 0) {
+            // Token bought (positive change)
+            $tokenOut = $mint;
+            $amountOut = $amount;
+        }
+    }
+    
+    // Calculate volume in SOL
+    if ($nativeBalanceChange != 0) {
+        $volumeSol = abs($nativeBalanceChange);
+    } else {
+        // Estimate based on token amounts (simplified)
+        $volumeSol = max($amountIn, $amountOut) * 0.001; // Rough estimation
+    }
+    
+    return [
+        'signature' => $tx['signature'] ?? '',
+        'timestamp' => $tx['timestamp'] ?? 0,
+        'token_in' => $tokenIn,
+        'token_out' => $tokenOut,
+        'amount_in' => $amountIn,
+        'amount_out' => $amountOut,
+        'volume_sol' => $volumeSol,
+        'description' => $description
+    ];
 }
 
 // Handle request
