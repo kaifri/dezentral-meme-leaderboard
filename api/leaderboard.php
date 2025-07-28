@@ -294,25 +294,113 @@ function logWalletActivity($wallet, $message) {
     file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
 }
 
+// Safe file writing with backup
+function safeWriteJsonFile($filepath, $data) {
+    $jsonData = json_encode($data, JSON_PRETTY_PRINT);
+    $tempFile = $filepath . '.tmp';
+    $backupFile = $filepath . '.backup';
+    
+    // Backup der aktuellen Datei erstellen
+    if (file_exists($filepath)) {
+        copy($filepath, $backupFile);
+    }
+    
+    // In temporäre Datei schreiben
+    if (file_put_contents($tempFile, $jsonData, LOCK_EX) !== false) {
+        // Validiere JSON
+        $testData = json_decode(file_get_contents($tempFile), true);
+        if (json_last_error() === JSON_ERROR_NONE && !empty($testData)) {
+            // Atomic rename
+            if (rename($tempFile, $filepath)) {
+                return true;
+            }
+        }
+    }
+    
+    // Bei Fehler: Backup wiederherstellen
+    if (file_exists($backupFile)) {
+        copy($backupFile, $filepath);
+    }
+    
+    // Cleanup
+    @unlink($tempFile);
+    return false;
+}
+
 // Update leaderboard data
 function updateLeaderboard() {
     global $CONFIG_FILE, $START_SOL_FILE, $DATA_FILE, $WINNER_POT_WALLET, $CHALLENGE_END_DATE;
     
-    // Load config
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
-    // Set German timezone for timestamp
     date_default_timezone_set('Europe/Berlin');
     
-    // Check if challenge ended
-    $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
-    $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
-    $challengeEnded = $nowDateTime >= $endDateTime;
+    // Parallel processing mit cURL multi
+    $multiHandle = curl_multi_init();
+    $curlHandles = [];
     
-    // Get winner pot balance
-    $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
+    // Prepare all RPC calls at once
+    foreach ($wallets as $entry) {
+        $wallet = $entry['wallet'];
+        
+        // SOL balance call
+        $solHandle = curl_init();
+        curl_setopt($solHandle, CURLOPT_URL, 'https://api.mainnet-beta.solana.com');
+        curl_setopt($solHandle, CURLOPT_POST, true);
+        curl_setopt($solHandle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($solHandle, CURLOPT_TIMEOUT, 10);
+        curl_setopt($solHandle, CURLOPT_POSTFIELDS, json_encode([
+            'jsonrpc' => '2.0',
+            'id' => "sol_{$wallet}",
+            'method' => 'getBalance',
+            'params' => [$wallet]
+        ]));
+        curl_setopt($solHandle, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        
+        curl_multi_add_handle($multiHandle, $solHandle);
+        $curlHandles["sol_{$wallet}"] = $solHandle;
+        
+        // Token balance call
+        $tokenHandle = curl_init();
+        curl_setopt($tokenHandle, CURLOPT_URL, 'https://api.mainnet-beta.solana.com');
+        curl_setopt($tokenHandle, CURLOPT_POST, true);
+        curl_setopt($tokenHandle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($tokenHandle, CURLOPT_TIMEOUT, 10);
+        curl_setopt($tokenHandle, CURLOPT_POSTFIELDS, json_encode([
+            'jsonrpc' => '2.0',
+            'id' => "tokens_{$wallet}",
+            'method' => 'getTokenAccountsByOwner',
+            'params' => [
+                $wallet,
+                ['programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'],
+                ['encoding' => 'jsonParsed']
+            ]
+        ]));
+        curl_setopt($tokenHandle, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        
+        curl_multi_add_handle($multiHandle, $tokenHandle);
+        $curlHandles["tokens_{$wallet}"] = $tokenHandle;
+    }
     
+    // Execute all calls in parallel
+    do {
+        $status = curl_multi_exec($multiHandle, $active);
+        if ($active) {
+            curl_multi_select($multiHandle);
+        }
+    } while ($active && $status == CURLM_OK);
+    
+    // Process results
+    $results = [];
+    foreach ($curlHandles as $key => $handle) {
+        $results[$key] = curl_multi_getcontent($handle);
+        curl_multi_remove_handle($multiHandle, $handle);
+        curl_close($handle);
+    }
+    curl_multi_close($multiHandle);
+    
+    // Now process the results quickly
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
     
@@ -320,59 +408,40 @@ function updateLeaderboard() {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
         
-        logWalletActivity($wallet, "=== PROCESSING WALLET: {$username} ===");
+        // Get SOL balance from parallel result
+        $solData = json_decode($results["sol_{$wallet}"] ?? '{}', true);
+        $sol = isset($solData['result']['value']) ? $solData['result']['value'] / 1000000000 : 0;
         
-        if (!isset($startSols[$wallet])) {
-            logWalletActivity($wallet, "ERROR: No start SOL balance found, skipping wallet");
-            continue;
-        }
+        // Get token balances from parallel result
+        $tokenData = json_decode($results["tokens_{$wallet}"] ?? '{}', true);
+        $tokens = [];
         
-        $sol = getSolBalance($wallet);
-        logWalletActivity($wallet, "SOL balance: {$sol}");
-        
-        $tokenValue = 0;
-        
-        if (!$challengeEnded) {
-            $tokens = getTokenBalances($wallet);
-            logWalletActivity($wallet, "Found " . count($tokens) . " tokens");
-            
-            foreach ($tokens as $mint => $amount) {
-                logWalletActivity($wallet, "Processing token {$mint} with amount {$amount}");
-                
-                $tokenPriceUsd = getTokenPrice($mint);
-                logWalletActivity($wallet, "Token {$mint} price: {$tokenPriceUsd} USD");
-                
-                if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
-                    $tokenValueSol = $amount * ($tokenPriceUsd / $solPriceUsd);
-                    $tokenValue += $tokenValueSol;
-                    logWalletActivity($wallet, "Added {$tokenValueSol} SOL value from token {$mint}");
-                } else {
-                    $reason = $tokenPriceUsd <= 0 ? "no price found" : "SOL price unavailable";
-                    logWalletActivity($wallet, "Skipped token {$mint} - {$reason}");
-                }
-            }
-        } else {
-            // Use frozen token values from last update
-            if (file_exists($DATA_FILE)) {
-                $lastData = json_decode(file_get_contents($DATA_FILE), true);
-                foreach ($lastData['data'] as $lastEntry) {
-                    if ($lastEntry['wallet'] === $wallet) {
-                        $tokenValue = $lastEntry['tokens'];
-                        logWalletActivity($wallet, "Using frozen token value: {$tokenValue} SOL");
-                        break;
+        if (isset($tokenData['result']['value'])) {
+            foreach ($tokenData['result']['value'] as $account) {
+                if (isset($account['account']['data']['parsed']['info'])) {
+                    $accountData = $account['account']['data']['parsed']['info'];
+                    $mint = $accountData['mint'] ?? '';
+                    $amount = floatval($accountData['tokenAmount']['uiAmount'] ?? 0);
+                    
+                    if ($mint && $amount > 0) {
+                        $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
                     }
                 }
-            } else {
-                logWalletActivity($wallet, "No previous data found for frozen token values");
+            }
+        }
+        
+        // Calculate token value (this part is still sequential but faster)
+        $tokenValue = 0;
+        foreach ($tokens as $mint => $amount) {
+            $tokenPriceUsd = getTokenPrice($mint);
+            if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
+                $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
             }
         }
         
         $total = $sol + $tokenValue;
-        $start = $startSols[$wallet];
+        $start = $startSols[$wallet] ?? 0;
         $changePct = $start > 0 ? (($total - $start) / $start * 100) : 0;
-        
-        logWalletActivity($wallet, "SUMMARY: SOL={$sol}, Tokens={$tokenValue}, Total={$total}, Change={$changePct}%");
-        logWalletActivity($wallet, "=== END PROCESSING ===\n");
         
         $leaderboard[] = [
             'username' => $username,
@@ -384,13 +453,21 @@ function updateLeaderboard() {
         ];
     }
     
-    // Sort by total (descending)
+    // Sort and return result
     usort($leaderboard, function($a, $b) {
         return $b['total'] <=> $a['total'];
     });
     
+    // Check if challenge ended
+    $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
+    $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
+    $challengeEnded = $nowDateTime >= $endDateTime;
+    
+    // Get winner pot balance
+    $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
+    
     $result = [
-        'updated' => date('Y-m-d H:i:s'), // Now in German time (CET/CEST)
+        'updated' => date('Y-m-d H:i:s'),
         'data' => $leaderboard,
         'winner_pot' => [
             'wallet' => $WINNER_POT_WALLET,
@@ -400,8 +477,12 @@ function updateLeaderboard() {
         'challenge_end_date' => $CHALLENGE_END_DATE
     ];
     
-    // Save to file
-    file_put_contents($DATA_FILE, json_encode($result, JSON_PRETTY_PRINT));
+    // Safe atomic write
+    if (safeWriteJsonFile($DATA_FILE, $result)) {
+        error_log("Leaderboard updated successfully at " . date('Y-m-d H:i:s'));
+    } else {
+        error_log("Failed to update leaderboard file");
+    }
     
     return $result;
 }
