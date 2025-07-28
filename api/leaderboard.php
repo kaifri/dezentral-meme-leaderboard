@@ -417,8 +417,10 @@ function fetchDefiActivitiesFromHelius($wallet, $startTimestamp) {
     
     $allActivities = [];
     $before = null;
-    $maxPages = 20; // Increase limit for more comprehensive data
+    $maxPages = 50; // Increase to get more history
     $pageCount = 0;
+    
+    logMessage("Starting to fetch activities for wallet: " . $wallet . " from timestamp: " . $startTimestamp . " (" . date('Y-m-d H:i:s', $startTimestamp) . ")", 'DEBUG');
     
     do {
         // Use parsed-transactions endpoint with DeFi focus
@@ -427,27 +429,37 @@ function fetchDefiActivitiesFromHelius($wallet, $startTimestamp) {
             $url .= "&before={$before}";
         }
         
-        logMessage("Fetching DeFi activities from: " . $url, 'DEBUG');
+        logMessage("Fetching page " . ($pageCount + 1) . " for wallet " . substr($wallet, 0, 8) . "... from: " . $url, 'DEBUG');
         
         $response = @file_get_contents($url);
         if ($response === false) {
-            logMessage("Failed to fetch activities from Helius API", 'ERROR');
+            logMessage("Failed to fetch activities from Helius API for wallet: " . $wallet, 'ERROR');
             break;
         }
         
         $data = json_decode($response, true);
         if (!isset($data) || !is_array($data)) {
-            logMessage("Invalid response from Helius API", 'ERROR');
+            logMessage("Invalid response from Helius API for wallet: " . $wallet, 'ERROR');
             break;
         }
         
+        logMessage("Received " . count($data) . " transactions in page " . ($pageCount + 1) . " for wallet " . substr($wallet, 0, 8) . "...", 'DEBUG');
+        
         $foundOlderTx = false;
+        $addedInThisPage = 0;
         
         foreach ($data as $tx) {
             $txTimestamp = $tx['timestamp'] ?? 0;
+            $txSignature = $tx['signature'] ?? 'unknown';
+            
+            // Debug: Log first few transactions of each page
+            if ($addedInThisPage < 3) {
+                logMessage("TX " . ($addedInThisPage + 1) . ": " . substr($txSignature, 0, 12) . "... - " . date('Y-m-d H:i:s', $txTimestamp) . " - Type: " . ($tx['type'] ?? 'UNKNOWN'), 'DEBUG');
+            }
             
             // Stop if we've gone past our start date (too old)
             if ($txTimestamp < $startTimestamp) {
+                logMessage("Found transaction older than start date: " . date('Y-m-d H:i:s', $txTimestamp) . " < " . date('Y-m-d H:i:s', $startTimestamp), 'DEBUG');
                 $foundOlderTx = true;
                 break;
             }
@@ -455,24 +467,36 @@ function fetchDefiActivitiesFromHelius($wallet, $startTimestamp) {
             // Only include transactions from challenge start onwards
             if ($txTimestamp >= $startTimestamp) {
                 $allActivities[] = $tx;
+                $addedInThisPage++;
             }
             
             $before = $tx['signature'] ?? null;
         }
         
+        logMessage("Added " . $addedInThisPage . " activities from page " . ($pageCount + 1) . " for wallet " . substr($wallet, 0, 8) . "...", 'DEBUG');
+        
         $pageCount++;
         
         // Stop conditions
         if ($foundOlderTx || empty($data) || count($data) < 100 || $pageCount >= $maxPages) {
+            logMessage("Stopping pagination: foundOlder=" . ($foundOlderTx ? 'YES' : 'NO') . ", emptyData=" . (empty($data) ? 'YES' : 'NO') . ", dataCount=" . count($data) . ", pageCount=" . $pageCount, 'DEBUG');
             break;
         }
         
         // Small delay to respect API limits
-        usleep(150000); // 0.15 second
+        usleep(200000); // 0.2 second
         
     } while (true);
     
-    logMessage("Fetched " . count($allActivities) . " activities from Helius in " . $pageCount . " pages (filtered from challenge start)", 'DEBUG');
+    logMessage("FINAL: Fetched " . count($allActivities) . " activities from " . $pageCount . " pages for wallet " . substr($wallet, 0, 8) . "... (filtered from challenge start)", 'INFO');
+    
+    // Debug: Show transaction type distribution
+    $typeDistribution = [];
+    foreach ($allActivities as $activity) {
+        $type = $activity['type'] ?? 'UNKNOWN';
+        $typeDistribution[$type] = ($typeDistribution[$type] ?? 0) + 1;
+    }
+    logMessage("Transaction type distribution for " . substr($wallet, 0, 8) . "...: " . json_encode($typeDistribution), 'DEBUG');
     
     return $allActivities;
 }
@@ -484,10 +508,7 @@ function analyzeDefiActivity($activity) {
     $events = $activity['events'] ?? [];
     $signature = $activity['signature'] ?? '';
     
-    // Log each activity for debugging
-    logMessage("Analyzing activity: " . $signature . " - Type: " . $txType . " - Description: " . $description, 'DEBUG');
-    
-    // More comprehensive swap detection
+    // More comprehensive swap detection patterns
     $swapPatterns = [
         'TOKEN_SWAP',
         'SWAP',
@@ -503,12 +524,17 @@ function analyzeDefiActivity($activity) {
         'swapped',
         'buy',
         'sell',
-        'purchase'
+        'purchase',
+        'AMM_SWAP',
+        'DEX_TRADE',
+        'LIMIT_ORDER',
+        'MARKET_ORDER'
     ];
     
     $isSwap = false;
     $matchedPattern = '';
     
+    // Check description and type for swap patterns
     foreach ($swapPatterns as $pattern) {
         if (stripos($description, $pattern) !== false || stripos($txType, $pattern) !== false) {
             $isSwap = true;
@@ -552,16 +578,17 @@ function analyzeDefiActivity($activity) {
         }
     }
     
+    // Log all activities for better debugging (not just swaps)
     if ($isSwap) {
-        logMessage("SWAP DETECTED with pattern: " . $matchedPattern . " - " . $signature, 'DEBUG');
+        logMessage("✅ SWAP DETECTED - Pattern: " . $matchedPattern . " - " . substr($signature, 0, 12) . "... - " . $description, 'INFO');
     } else {
-        logMessage("NOT A SWAP: " . $signature . " - Available events: " . count($events), 'DEBUG');
-        // Log the first few events for debugging
-        if (!empty($events)) {
-            foreach (array_slice($events, 0, 3) as $i => $event) {
-                logMessage("Event " . $i . ": " . json_encode($event), 'DEBUG');
-            }
+        // Only log non-transfers for cleaner output
+        if ($txType !== 'TRANSFER') {
+            logMessage("❌ NOT A SWAP (" . $txType . ") - " . substr($signature, 0, 12) . "... - " . $description, 'DEBUG');
         }
+    }
+    
+    if (!$isSwap) {
         return null;
     }
     
@@ -574,16 +601,12 @@ function analyzeDefiActivity($activity) {
     $amountOut = 0;
     $volumeSol = 0;
     
-    logMessage("Token balance changes count: " . count($tokenBalanceChanges) . ", Native change: " . $nativeBalanceChange, 'DEBUG');
-    
     // Analyze token balance changes
     foreach ($tokenBalanceChanges as $change) {
         $mint = $change['mint'] ?? '';
         $rawAmount = floatval($change['rawTokenAmount']['tokenAmount'] ?? 0);
         $decimals = intval($change['rawTokenAmount']['decimals'] ?? 0);
         $amount = $decimals > 0 ? $rawAmount / pow(10, $decimals) : $rawAmount;
-        
-        logMessage("Token change - Mint: " . substr($mint, 0, 8) . "..., Raw: " . $rawAmount . ", Decimals: " . $decimals . ", Amount: " . $amount, 'DEBUG');
         
         if ($rawAmount < 0) {
             // Token sold (negative change)
@@ -596,20 +619,24 @@ function analyzeDefiActivity($activity) {
         }
     }
     
-    // Calculate volume in SOL - improved logic
-    if (abs($nativeBalanceChange) > 0.0001) { // Lower threshold
+    // Calculate volume in SOL - improved logic with description parsing
+    if (abs($nativeBalanceChange) > 0.0001) {
         $volumeSol = abs($nativeBalanceChange);
-        logMessage("Using native balance change for volume: " . $volumeSol, 'DEBUG');
+        logMessage("📊 Volume from native balance: " . $volumeSol . " SOL", 'DEBUG');
     } else {
-        // For token-to-token swaps, estimate volume
-        // This is simplified - ideally we'd get historical prices
-        if ($amountIn > 0 || $amountOut > 0) {
-            $estimatedVolume = max($amountIn * 0.00001, $amountOut * 0.00001, 0.01); // More conservative estimation
+        // Try to extract SOL amount from description
+        $extractedVolume = extractSolAmountFromDescription($description);
+        if ($extractedVolume > 0) {
+            $volumeSol = $extractedVolume;
+            logMessage("📊 Volume from description: " . $volumeSol . " SOL", 'DEBUG');
+        } elseif ($amountIn > 0 || $amountOut > 0) {
+            // For token-to-token swaps, estimate volume
+            $estimatedVolume = max($amountIn * 0.00001, $amountOut * 0.00001, 0.01);
             $volumeSol = $estimatedVolume;
-            logMessage("Estimated volume from token amounts: " . $volumeSol, 'DEBUG');
+            logMessage("📊 Estimated volume: " . $volumeSol . " SOL", 'DEBUG');
         } else {
             $volumeSol = 0.01; // Default minimum volume for counting
-            logMessage("Using default minimum volume: " . $volumeSol, 'DEBUG');
+            logMessage("📊 Default minimum volume: " . $volumeSol . " SOL", 'DEBUG');
         }
     }
     
@@ -625,6 +652,32 @@ function analyzeDefiActivity($activity) {
         'type' => $txType,
         'matched_pattern' => $matchedPattern
     ];
+}
+
+// Extract SOL amounts from transaction descriptions
+function extractSolAmountFromDescription($description) {
+    // Pattern to match SOL amounts in descriptions like:
+    // "swapped 0.07 SOL for 287567.30276 Spacy"
+    // "swapped 10444.453166 token for 0.113368347 SOL"
+    
+    $patterns = [
+        '/swapped\s+([\d,]+\.?\d*)\s+SOL\s+for/i',      // "swapped X SOL for"
+        '/for\s+([\d,]+\.?\d*)\s+SOL$/i',               // "for X SOL"
+        '/\s([\d,]+\.?\d*)\s+SOL\s/i',                  // " X SOL "
+    ];
+    
+    foreach ($patterns as $pattern) {
+        if (preg_match($pattern, $description, $matches)) {
+            $amount = str_replace(',', '', $matches[1]);
+            $solAmount = floatval($amount);
+            
+            if ($solAmount > 0 && $solAmount < 1000) { // Reasonable range for SOL amounts
+                return $solAmount;
+            }
+        }
+    }
+    
+    return 0;
 }
 
 // Handle request
