@@ -326,6 +326,47 @@ $frontend_config = [
         lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
       }
     }, 30000);
+
+    document.addEventListener('DOMContentLoaded', function() {
+    // Format the challenge end date properly
+    function formatDate(isoString) {
+        if (!isoString) return 'Not set';
+        
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return 'Invalid date';
+            
+            // Format as DD.MM.YYYY, HH:MM:SS
+            return date.toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } catch (e) {
+            console.error('Date parsing error:', e);
+            return 'Date error';
+        }
+    }
+
+    // When updating the UI with leaderboard data:
+    function updateLeaderboard(data) {
+        // Set the end date display
+        const endDateElement = document.getElementById('challenge-end-date');
+        if (endDateElement) {
+            const formattedDate = formatDate(data.challenge_end_date);
+            endDateElement.textContent = `Challenge läuft bis ${formattedDate}`;
+            
+            // Debug the date value
+            console.log('Raw end date:', data.challenge_end_date);
+            console.log('Formatted date:', formattedDate);
+        }
+        
+        // Rest of your update code...
+    }
+});
   </script>
 
   <!-- Footer -->

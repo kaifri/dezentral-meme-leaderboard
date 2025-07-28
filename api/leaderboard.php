@@ -84,155 +84,143 @@ function getTokenBalances($wallet) {
 
 // Get token price from Dexscreener
 function getTokenPrice($mint, $preventRecursion = false) {
-    // Special case for SOL to prevent recursion
-    if ($mint === "So11111111111111111111111111111111111111112" && !$preventRecursion) {
-        logMessage("SOL token detected, using direct USD price lookup", 'DEBUG');
-        // Get SOL price directly from Jupiter without recursion
-        $jupiterUrl = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC";
-        $jupResponse = @file_get_contents($jupiterUrl);
-        
-        if ($jupResponse !== false) {
-            $jupData = json_decode($jupResponse, true);
-            if (isset($jupData['data'][$mint]['price'])) {
-                $price = floatval($jupData['data'][$mint]['price']);
-                if ($price > 0) {
-                    return $price; // Return USD price for SOL
-                }
-            }
-        }
-        
-        // If Jupiter fails, use a hardcoded fallback price
-        logMessage("Failed to get SOL price from Jupiter, using fallback", 'WARNING');
-        return 30.0; // Fallback SOL price in USD
+    // Special case for SOL token to prevent recursion
+    if (strtolower($mint) === strtolower("So11111111111111111111111111111111111111112") && !$preventRecursion) {
+        logMessage("SOL token detected, using direct USD price from Jupiter", 'DEBUG');
+        return getSolPriceUsd();
+    }
+    
+    // Skip known stable coins
+    if ($mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") { // USDC
+        return 1; // USDC is basically $1
     }
     
     logMessage("Getting price for token: " . substr($mint, 0, 12) . "...", 'DEBUG');
     
-    // First check if there's a manual override
+    // Check for manual override
     $overridesFile = __DIR__ . '/../config/token_price_overrides.json';
     if (file_exists($overridesFile)) {
         $overrides = json_decode(file_get_contents($overridesFile), true);
         if (isset($overrides[$mint])) {
             $override = $overrides[$mint];
             if (time() - $override['timestamp'] < 3600) { // Valid for 1 hour
-                logMessage("Using manual price override for " . substr($mint, 0, 12) . 
-                          ": " . $override['price_sol'] . " SOL", 'INFO');
-                return $override['price_sol'];
+                logMessage("Using manual price override: " . $override['price_usd'] . " USD", 'INFO');
+                return $override['price_usd'];
             }
         }
     }
     
-    // Skip known stable coins to improve performance
-    if ($mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") { // USDC
-        return 1 / getSolPriceUsd(); // Convert USD to SOL
-    }
-    
-    // 1. Try Dexscreener with special handling for new tokens
+    // Get price from Dexscreener - simpler approach that worked before
     $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
     $response = @file_get_contents($url);
     
-    if ($response !== false) {
-        $data = json_decode($response, true);
-        $pairs = $data['pairs'] ?? [];
+    if ($response === false) {
+        logMessage("Dexscreener API request failed for token: " . substr($mint, 0, 12), 'WARNING');
+        return 0;
+    }
+    
+    $data = json_decode($response, true);
+    $pairs = $data['pairs'] ?? [];
+    
+    if (empty($pairs)) {
+        logMessage("No pairs found for token: " . substr($mint, 0, 12), 'WARNING');
+        return 0;
+    }
+    
+    // Sort by liquidity
+    usort($pairs, function($a, $b) {
+        $liqA = floatval($a['liquidity']['usd'] ?? 0);
+        $liqB = floatval($b['liquidity']['usd'] ?? 0);
+        return $liqB <=> $liqA;
+    });
+    
+    // Log the top pairs for debugging
+    $topPairsCount = min(3, count($pairs));
+    for ($i = 0; $i < $topPairsCount; $i++) {
+        $pair = $pairs[$i];
+        logMessage("Top pair #{$i}: " . 
+               ($pair['baseToken']['symbol'] ?? '?') . "/" . 
+               ($pair['quoteToken']['symbol'] ?? '?') . 
+               " - Liq: $" . ($pair['liquidity']['usd'] ?? 0), 'DEBUG');
+    }
+    
+    // First try direct SOL pairs for better calculation
+    foreach ($pairs as $pair) {
+        $baseToken = $pair['baseToken']['address'] ?? '';
+        $quoteToken = $pair['quoteToken']['address'] ?? '';
         
-        if (!empty($pairs)) {
-            // Sort by created timestamp (newest first) for new tokens, then by liquidity
-            usort($pairs, function($a, $b) {
-                // Compare creation time first - new tokens should prioritize newest pairs
-                $createdAtA = strtotime($a['createdAt'] ?? '');
-                $createdAtB = strtotime($b['createdAt'] ?? '');
-                if (abs($createdAtA - $createdAtB) > 86400) { // If more than a day difference
-                    return $createdAtB <=> $createdAtA; // Newer first
-                }
-                
-                // Then compare by liquidity
-                $liqA = floatval($a['liquidity']['usd'] ?? 0);
-                $liqB = floatval($b['liquidity']['usd'] ?? 0);
-                return $liqB <=> $liqA;
-            });
-            
-            // Log pair info for debugging
-            foreach ($pairs as $index => $pair) {
-                logMessage("Pair #{$index}: " . 
-                           ($pair['baseToken']['symbol'] ?? '?') . "/" . 
-                           ($pair['quoteToken']['symbol'] ?? '?') . 
-                           " - Liq: $" . ($pair['liquidity']['usd'] ?? 0) . 
-                           ", Created: " . ($pair['createdAt'] ?? 'unknown'), 'DEBUG');
+        // Direct SOL pair
+        if (strtolower($quoteToken) === strtolower("So11111111111111111111111111111111111111112") && 
+            strtolower($baseToken) === strtolower($mint)) {
+            $priceInSol = floatval($pair['priceNative'] ?? 0);
+            if ($priceInSol > 0) {
+                logMessage("Found direct SOL pair price: " . $priceInSol . " SOL", 'DEBUG');
+                // Convert to USD for consistent return values
+                $solPriceUsd = getSolPriceUsd();
+                return $priceInSol * $solPriceUsd;
             }
-            
-            // First try SOL pairs directly - most accurate for new tokens
-            foreach ($pairs as $pair) {
-                $baseToken = $pair['baseToken']['address'] ?? '';
-                $quoteToken = $pair['quoteToken']['address'] ?? '';
-                
-                // Direct SOL pricing - most reliable for new tokens
-                if ($quoteToken === "So11111111111111111111111111111111111111112" && $baseToken === $mint) {
-                    $priceInSol = floatval($pair['priceNative'] ?? 0);
-                    if ($priceInSol > 0) {
-                        logMessage("Found direct SOL pair price: " . $priceInSol . 
-                                  " (Created: " . ($pair['createdAt'] ?? 'unknown') . ")", 'DEBUG');
-                        return $priceInSol;
-                    }
-                }
-                
-                // Reverse SOL pair
-                if ($baseToken === "So11111111111111111111111111111111111111112" && $quoteToken === $mint) {
-                    $priceInSol = 1 / floatval($pair['priceNative'] ?? 0);
-                    if ($priceInSol > 0 && is_finite($priceInSol)) {
-                        logMessage("Found inverse SOL pair price: " . $priceInSol, 'DEBUG');
-                        return $priceInSol;
-                    }
-                }
+        }
+        
+        // Inverse SOL pair
+        if (strtolower($baseToken) === strtolower("So11111111111111111111111111111111111111112") && 
+            strtolower($quoteToken) === strtolower($mint)) {
+            $priceInSol = 1 / floatval($pair['priceNative'] ?? 0);
+            if ($priceInSol > 0 && is_finite($priceInSol)) {
+                logMessage("Found inverse SOL pair price: " . $priceInSol . " SOL", 'DEBUG');
+                // Convert to USD for consistent return values
+                $solPriceUsd = getSolPriceUsd();
+                return $priceInSol * $solPriceUsd;
             }
-            
-            // Then try USD pairs
-            foreach ($pairs as $pair) {
-                $baseToken = $pair['baseToken']['address'] ?? '';
-                $quoteToken = $pair['quoteToken']['address'] ?? '';
-                $priceUsd = floatval($pair['priceUsd'] ?? 0);
-                
-                if ($baseToken === $mint && $priceUsd > 0) {
-                    $solPriceUsd = getSolPriceUsd();
-                    if ($solPriceUsd > 0) {
-                        $priceInSol = $priceUsd / $solPriceUsd;
-                        logMessage("Found USD price from Dexscreener: $" . $priceUsd . 
-                                  " → " . $priceInSol . " SOL", 'DEBUG');
-                        return $priceInSol;
-                    }
-                }
-            }
-        } else {
-            logMessage("No pairs found on Dexscreener for: " . substr($mint, 0, 12), 'DEBUG');
         }
     }
     
-    // 2. Add Birdeye API for new tokens (requires API key)
-    // Birdeye often indexes new tokens faster than other platforms
-    // $birdeyeUrl = "https://api.birdeye.so/v2/tokens/price?address={$mint}";
-    // Implement Birdeye API if you have access
+    // Then try USD pairs (directly)
+    foreach ($pairs as $pair) {
+        $baseToken = $pair['baseToken']['address'] ?? '';
+        $quoteToken = $pair['quoteToken']['address'] ?? '';
+        $priceUsd = floatval($pair['priceUsd'] ?? 0);
+        
+        if (strtolower($baseToken) === strtolower($mint) && $priceUsd > 0) {
+            logMessage("Found direct USD price: $" . $priceUsd, 'DEBUG');
+            return $priceUsd;
+        } else if (strtolower($quoteToken) === strtolower($mint) && $priceUsd > 0) {
+            $inversePrice = 1 / $priceUsd;
+            logMessage("Found inverse USD price: $" . $inversePrice, 'DEBUG');
+            return $inversePrice;
+        }
+    }
     
-    logMessage("No price found for token: " . substr($mint, 0, 12) . "...", 'WARNING');
+    logMessage("No valid price found for token: " . substr($mint, 0, 12), 'WARNING');
     return 0;
 }
 
-// Get SOL price in USD
+// Update the getSolPriceUsd function too, to avoid recursion
 function getSolPriceUsd() {
-    // Try Jupiter first
+    // Try Jupiter first - this is more reliable for SOL price
     $url = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC";
     $response = @file_get_contents($url);
     
     if ($response !== false) {
         $data = json_decode($response, true);
-        $price = floatval($data['data']['So11111111111111111111111111111111111111112']['price'] ?? 0);
+        $price = 0;
+        
+        // Case-insensitive lookup
+        foreach ($data['data'] ?? [] as $key => $value) {
+            if (strtolower($key) === strtolower("So11111111111111111111111111111111111111112")) {
+                $price = floatval($value['price'] ?? 0);
+                break;
+            }
+        }
+        
         if ($price > 0) {
             logMessage("Got SOL price from Jupiter: $" . $price, 'DEBUG');
             return $price;
         }
     }
     
-    // New fallback - don't use getTokenPrice to avoid recursion
-    logMessage("Jupiter failed for SOL price, using hardcoded fallback", 'WARNING');
-    return 30.0; // Fallback SOL price (you should update this regularly)
+    // Use hardcoded fallback - DON'T call getTokenPrice to avoid recursion
+    logMessage("Using hardcoded SOL price fallback", 'WARNING');
+    return 30.0; // Hardcoded SOL price - update this regularly
 }
 
 // Get Swap History
@@ -415,7 +403,8 @@ function updateLeaderboard($configInput = null) {
         'debug' => [
             'raw_end_date' => $challengeEndDateRaw,
             'end_date_parsed' => $endDateTime->format('Y-m-d H:i:s T'),
-            'current_time' => $nowDateTime->format('Y-m-d H:i:s T')
+            'current_time' => $nowDateTime->format('Y-m-d H:i:s T'),
+            'is_valid_date' => !empty($challengeEndDateRaw) && strtotime($challengeEndDateRaw) !== false
         ]
     ];
     
