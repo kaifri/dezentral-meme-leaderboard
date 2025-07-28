@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen flex flex-col items-center py-10 px-4">
-  <h1 class="text-4xl font-bold mb-4 text-yellow-400">🔥 Solana Leaderboard</h1>
+  <h1 class="text-4xl font-bold mb-4 text-yellow-400">🔥 BfdA Solana Shitcoin Contest</h1>
   
   <!-- Challenge Status Banner -->
   <div id="challenge-status" class="mb-4 px-4 py-2 rounded-lg text-center hidden">
@@ -23,10 +23,15 @@
   <div id="winner-pot" class="mb-6 bg-gradient-to-r from-yellow-800 to-yellow-600 px-6 py-3 rounded-lg text-center hidden">
     <div class="text-yellow-200 text-sm">🏆 Gewinner-Pot</div>
     <div class="text-yellow-100 text-xl font-bold"><span id="pot-balance">0</span> SOL</div>
-    <div class="text-yellow-200 text-xs">Wallet: <span id="pot-wallet" class="font-mono"></span></div>
+    <div class="text-yellow-200 text-xs">
+      Wallet: 
+      <a href="#" id="pot-wallet-link" target="_blank" class="font-mono hover:text-yellow-100 underline">
+        <span id="pot-wallet"></span>
+      </a>
+    </div>
   </div>
 
-  <p class="mb-6 text-sm text-gray-400">Stand: <span id="last-updated">...</span></p>
+  <p class="mb-6 text-sm text-gray-400">Update: <span id="last-updated">...</span></p>
   
   <div class="w-full max-w-5xl overflow-x-auto">
     <table class="min-w-full bg-gray-800 shadow-md rounded-lg overflow-hidden">
@@ -54,6 +59,24 @@
   </div>
 
   <script>
+    function getTimeAgo(isoString) {
+      const now = new Date();
+      const updated = new Date(isoString);
+      const diffMs = now - updated;
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return "gerade eben";
+      if (diffMins === 1) return "vor 1 Minute";
+      if (diffMins < 60) return `vor ${diffMins} Minuten`;
+      
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours === 1) return "vor 1 Stunde";
+      if (diffHours < 24) return `vor ${diffHours} Stunden`;
+      
+      const diffDays = Math.floor(diffHours / 24);
+      return `vor ${diffDays} Tag${diffDays === 1 ? '' : 'en'}`;
+    }
+
     function updateLeaderboard() {
       fetch("data/leaderboard.json")
         .then(res => res.json())
@@ -67,12 +90,14 @@
           const winnerPot = document.getElementById("winner-pot");
           const potBalance = document.getElementById("pot-balance");
           const potWallet = document.getElementById("pot-wallet");
+          const potWalletLink = document.getElementById("pot-wallet-link");
           const winnerAnnouncement = document.getElementById("winner-announcement");
           const winnerName = document.getElementById("winner-name");
           const winnerTotal = document.getElementById("winner-total");
           const winnerChange = document.getElementById("winner-change");
 
-          updated.textContent = new Date(json.updated).toLocaleString('de-DE');
+          // Update "updated x minutes ago"
+          updated.textContent = getTimeAgo(json.updated);
           tbody.innerHTML = "";
 
           // Update challenge status
@@ -83,14 +108,18 @@
           } else {
             challengeActive.classList.remove("hidden");
             challengeEnded.classList.add("hidden");
-            endDate.textContent = new Date(json.challenge_end_date).toLocaleString('de-DE');
+            // Convert UTC to UTC+2 for display
+            const endDateUTC = new Date(json.challenge_end_date);
+            const endDateLocal = new Date(endDateUTC.getTime() + (2 * 60 * 60 * 1000)); // Add 2 hours
+            endDate.textContent = endDateLocal.toLocaleString('de-DE');
           }
 
-          // Update winner pot
+          // Update winner pot with clickable wallet
           if (json.winner_pot) {
             winnerPot.classList.remove("hidden");
             potBalance.textContent = json.winner_pot.balance;
             potWallet.textContent = `${json.winner_pot.wallet.slice(0, 4)}...${json.winner_pot.wallet.slice(-4)}`;
+            potWalletLink.href = `https://solscan.io/account/${json.winner_pot.wallet}`;
           }
 
           // Show winner announcement if challenge ended
@@ -137,7 +166,15 @@
     }
     
     updateLeaderboard();
-    setInterval(updateLeaderboard, 30000);
+    // Update every 5 minutes (300000 ms)
+    setInterval(updateLeaderboard, 300000);
+    // Also update the "x minutes ago" every minute for accuracy
+    setInterval(() => {
+      const lastUpdatedElement = document.getElementById("last-updated");
+      if (lastUpdatedElement.dataset.lastUpdate) {
+        lastUpdatedElement.textContent = getTimeAgo(lastUpdatedElement.dataset.lastUpdate);
+      }
+    }, 60000);
   </script>
 </body>
 </html>

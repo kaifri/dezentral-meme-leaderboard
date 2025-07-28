@@ -12,7 +12,8 @@ CONFIG = "config/wallets.json"
 OUTPUT = "data/leaderboard.json"
 START_SOL_PATH = "data/start_sol_balances.json"
 START_DATE = datetime(2025, 1, 27, 22, 0, 1, tzinfo=timezone.utc)
-CHALLENGE_END_DATE = datetime(2025, 8, 4, 0, 0, 0, tzinfo=timezone.utc)
+# Challenge ends at midnight UTC+2 (22:00 UTC on August 3rd)
+CHALLENGE_END_DATE = datetime(2025, 8, 3, 22, 0, 0, tzinfo=timezone.utc)
 WINNER_POT_WALLET = "HuoAiJTK2qYQ7jgVDK7X9T1NBDV7nFzQQzwfvs4MtoKN"
 # Note: Frontend should use https://solscan.io/account/{wallet} for wallet links
 
