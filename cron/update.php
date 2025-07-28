@@ -63,7 +63,12 @@ try {
         $walletCount = count($data['data']);
         $challengeStatus = $data['challenge_ended'] ? 'ENDED' : 'ACTIVE';
         
+        // Enhanced logging with debug info
         logMessage("✅ Update successful: {$walletCount} wallets processed in {$executionTime}ms, Challenge: {$challengeStatus}", 'SUCCESS');
+        
+        if (isset($data['debug'])) {
+            logMessage("Debug - End Date: {$data['debug']['end_date_parsed']}, Current: {$data['debug']['current_time']}", 'DEBUG');
+        }
         
         // Log some stats
         if (!empty($data['data'])) {

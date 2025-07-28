@@ -126,8 +126,16 @@ function updateLeaderboard() {
     $wallets = json_decode(file_get_contents($CONFIG_FILE), true);
     $startSols = json_decode(file_get_contents($START_SOL_FILE), true);
     
-    // Check if challenge ended
-    $challengeEnded = time() >= strtotime($CHALLENGE_END_DATE);
+    // Check if challenge ended - FIX: Use DateTime for proper UTC parsing
+    $endDateTime = new DateTime($CHALLENGE_END_DATE);  // This properly handles ISO 8601 format
+    $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
+    $challengeEnded = $nowDateTime >= $endDateTime;
+    
+    // Debug logging
+    error_log("Challenge End Date: " . $CHALLENGE_END_DATE);
+    error_log("Parsed End DateTime: " . $endDateTime->format('Y-m-d H:i:s T'));
+    error_log("Current DateTime: " . $nowDateTime->format('Y-m-d H:i:s T'));
+    error_log("Challenge Ended: " . ($challengeEnded ? 'YES' : 'NO'));
     
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
@@ -194,7 +202,13 @@ function updateLeaderboard() {
             'balance' => round($winnerPotBalance, 4)
         ],
         'challenge_ended' => $challengeEnded,
-        'challenge_end_date' => $CHALLENGE_END_DATE
+        'challenge_end_date' => $CHALLENGE_END_DATE,
+        // Debug info
+        'debug' => [
+            'end_date_parsed' => $endDateTime->format('Y-m-d H:i:s T'),
+            'current_time' => $nowDateTime->format('Y-m-d H:i:s T'),
+            'challenge_ended' => $challengeEnded
+        ]
     ];
     
     // Save to file
