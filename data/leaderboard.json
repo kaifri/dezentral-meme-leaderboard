@@ -1,5 +1,5 @@
 {
-  "updated": "2025-07-28T17:02:33.859584+00:00",
+  "updated": "2025-07-28T17:30:34.543344+00:00",
   "data": [
     {
       "username": "LaVleR",
@@ -21,9 +21,9 @@
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.4659,
-      "total": 0.5083,
-      "change_pct": 0.55
+      "tokens": 0.4515,
+      "total": 0.4939,
+      "change_pct": -2.29
     },
     {
       "username": "hir0",
@@ -36,10 +36,10 @@
     {
       "username": "Wozzelsepp",
       "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
-      "sol": 0.2898,
-      "tokens": 0.1229,
-      "total": 0.4127,
-      "change_pct": -17.45
+      "sol": 0.1348,
+      "tokens": 0.2482,
+      "total": 0.383,
+      "change_pct": -23.4
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
@@ -61,14 +61,14 @@
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.0191,
-      "tokens": 0.0702,
-      "total": 0.0892,
-      "change_pct": -82.15
+      "tokens": 0.0072,
+      "total": 0.0263,
+      "change_pct": -94.75
     }
   ],
   "winner_pot": {
     "wallet": "HuoAiJTK2qYQ7jgVDK7X9T1NBDV7nFzQQzwfvs4MtoKN",
-    "balance": 4.0001
+    "balance": 0.0
   },
   "challenge_ended": false,
   "challenge_end_date": "2025-08-03T22:00:00+00:00"
