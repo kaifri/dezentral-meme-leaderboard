@@ -1,13 +1,13 @@
 {
-  "updated": "2025-07-28T11:46:45.211700+00:00",
+  "updated": "2025-07-28T11:54:06.749581+00:00",
   "data": [
     {
       "username": "LaVleR",
       "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
       "sol": 0.0167,
-      "tokens": 1.0503,
-      "total": 1.067,
-      "change_pct": 119.19
+      "tokens": 1.0433,
+      "total": 1.06,
+      "change_pct": 117.74
     },
     {
       "username": "Umut",
@@ -21,33 +21,25 @@
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.4571,
-      "total": 0.4995,
-      "change_pct": -1.19
+      "tokens": 0.4564,
+      "total": 0.4988,
+      "change_pct": -1.33
     },
     {
       "username": "Wozzelsepp",
       "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
       "sol": 0.2898,
-      "tokens": 0.1938,
-      "total": 0.4836,
-      "change_pct": -3.28
-    },
-    {
-      "username": "Moge G",
-      "wallet": "2r6rkq4Vkyj3o2LsCmYGTdxKNFerhpQCWHFvaxY4x7KE",
-      "sol": 0.2511,
-      "tokens": 0.2273,
-      "total": 0.4784,
-      "change_pct": -4.29
+      "tokens": 0.1809,
+      "total": 0.4707,
+      "change_pct": -5.87
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
       "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
-      "sol": 0.4431,
-      "tokens": 0,
-      "total": 0.4431,
-      "change_pct": -11.39
+      "sol": 0.033,
+      "tokens": 0.3583,
+      "total": 0.3913,
+      "change_pct": -21.75
     },
     {
       "username": "hir0",
@@ -58,12 +50,20 @@
       "change_pct": -23.33
     },
     {
+      "username": "Moge G",
+      "wallet": "2r6rkq4Vkyj3o2LsCmYGTdxKNFerhpQCWHFvaxY4x7KE",
+      "sol": 0.2641,
+      "tokens": 0,
+      "total": 0.2641,
+      "change_pct": -47.18
+    },
+    {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.0338,
-      "tokens": 0.2229,
-      "total": 0.2567,
-      "change_pct": -48.67
+      "tokens": 0.2071,
+      "total": 0.2409,
+      "change_pct": -51.82
     }
   ],
   "winner_pot": {
