@@ -92,15 +92,12 @@ $frontend_config = [
   </div>
 
   <!-- Winner Pot Display -->
-  <div id="winner-pot" class="mb-4 sm:mb-6 bg-gradient-to-r from-yellow-800 via-yellow-600 to-yellow-800 px-4 sm:px-8 py-3 sm:py-4 rounded-xl text-center shadow-2xl hidden w-full max-w-sm">
-    <div class="text-yellow-200 text-xs sm:text-sm">🏆 Gewinner-Pot</div>
-    <div class="text-yellow-100 text-lg sm:text-2xl font-bold"><span id="pot-balance">0</span> SOL</div>
-    <div class="text-yellow-200 text-xs">
-      Wallet: 
-      <a href="#" id="pot-wallet-link" target="_blank" class="font-mono hover:text-yellow-100 underline transition-colors">
-        <span id="pot-wallet"></span>
-      </a>
-    </div>
+  <div id="winner-pot" class="mb-4 sm:mb-6 bg-gradient-to-r from-green-800 via-emerald-700 to-green-800 px-4 sm:px-8 py-3 sm:py-4 rounded-xl text-center shadow-2xl pot-glow w-full max-w-md">
+    <div class="text-base sm:text-xl text-green-200 mb-1 sm:mb-2">💰 Winner Pot</div>
+    <div id="pot-balance" class="text-xl sm:text-3xl font-bold text-green-100 mb-1 sm:mb-2">... SOL</div>
+    <a id="pot-wallet-link" href="#" target="_blank" class="text-xs sm:text-sm text-green-300 hover:text-green-200 transition-colors">
+      Wallet: <span id="pot-wallet" class="font-mono">...</span>
+    </a>
   </div>
 
   <p class="mb-4 sm:mb-6 text-xs sm:text-sm text-gray-400">🕒 Update: <span id="last-updated">...</span></p>
@@ -300,10 +297,15 @@ $frontend_config = [
             });
           }
 
-          // Update winner pot with clickable wallet
+          // Update winner pot with clickable wallet and USD value
           if (json.winner_pot) {
             winnerPot.classList.remove("hidden");
-            potBalance.textContent = json.winner_pot.balance;
+            
+            // Update balance display with USD value
+            const balanceText = `${json.winner_pot.balance} SOL`;
+            const usdText = json.winner_pot.balance_usd ? ` (~$${json.winner_pot.balance_usd.toLocaleString()})` : '';
+            potBalance.innerHTML = `${balanceText}<span class="text-sm text-gray-400 block">${usdText}</span>`;
+            
             potWallet.textContent = `${json.winner_pot.wallet.slice(0, 4)}...${json.winner_pot.wallet.slice(-4)}`;
             potWalletLink.href = `https://solscan.io/account/${json.winner_pot.wallet}`;
           }

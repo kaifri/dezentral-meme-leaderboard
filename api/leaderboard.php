@@ -218,13 +218,41 @@ function getTokenBalancesHelius($wallet) {
     return $tokens;
 }
 
-// Get token price from Dexscreener
+// Get token price from Dexscreener with caching and rate limiting
 function getTokenPrice($mint) {
+    static $priceCache = [];
+    static $lastRequestTime = 0;
+    $cacheLifetime = 120; // 2 minutes cache
+    $rateLimitDelay = 500000; // 500ms delay between requests
+    
+    $now = time();
+    $cacheKey = $mint;
+    
+    // Check cache first
+    if (isset($priceCache[$cacheKey]) && 
+        ($now - $priceCache[$cacheKey]['timestamp']) < $cacheLifetime) {
+        return $priceCache[$cacheKey]['price'];
+    }
+    
+    // Rate limiting - wait between requests
+    $timeSinceLastRequest = microtime(true) - $lastRequestTime;
+    if ($timeSinceLastRequest < ($rateLimitDelay / 1000000)) {
+        usleep($rateLimitDelay - ($timeSinceLastRequest * 1000000));
+    }
+    
     $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
     $response = @file_get_contents($url);
+    $lastRequestTime = microtime(true);
     
+    $price = 0;
     if ($response === false) {
-        error_log("Failed to fetch data from Dexscreener for token: {$mint}");
+        error_log("Failed to fetch data from Dexscreener for token: {$mint} (possible rate limit)");
+        
+        // Return cached value if available, even if expired
+        if (isset($priceCache[$cacheKey])) {
+            error_log("Using expired cache for token: {$mint}");
+            return $priceCache[$cacheKey]['price'];
+        }
         return 0;
     }
     
@@ -233,6 +261,11 @@ function getTokenPrice($mint) {
     
     if (empty($pairs)) {
         error_log("No trading pairs found for token: {$mint}");
+        // Cache 0 price to avoid repeated failed requests
+        $priceCache[$cacheKey] = [
+            'price' => 0,
+            'timestamp' => $now
+        ];
         return 0;
     }
     
@@ -250,20 +283,42 @@ function getTokenPrice($mint) {
         
         // If our token is the base token, use priceUsd directly
         if ($baseToken === $mint && $priceUsd > 0) {
-            return $priceUsd;
+            $price = $priceUsd;
+            break;
         }
         // If our token is the quote token, invert the price
         elseif ($quoteToken === $mint && $priceUsd > 0) {
-            return 1 / $priceUsd;
+            $price = 1 / $priceUsd;
+            break;
         }
     }
     
-    error_log("No valid price found for token: {$mint}");
-    return 0;
+    // Cache the result
+    $priceCache[$cacheKey] = [
+        'price' => $price,
+        'timestamp' => $now
+    ];
+    
+    if ($price === 0) {
+        error_log("No valid price found for token: {$mint}");
+    }
+    
+    return $price;
 }
 
-// Get SOL price in USD
+// Get SOL price in USD with caching
 function getSolPriceUsd() {
+    static $solPriceCache = null;
+    static $lastSolPriceTime = 0;
+    $cacheLifetime = 60; // 1 minute cache for SOL price
+    
+    $now = time();
+    
+    // Check cache
+    if ($solPriceCache !== null && ($now - $lastSolPriceTime) < $cacheLifetime) {
+        return $solPriceCache;
+    }
+    
     // Try Jupiter first
     $url = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC";
     $response = @file_get_contents($url);
@@ -271,11 +326,21 @@ function getSolPriceUsd() {
     if ($response !== false) {
         $data = json_decode($response, true);
         $price = floatval($data['data']['So11111111111111111111111111111111111111112']['price'] ?? 0);
-        if ($price > 0) return $price;
+        if ($price > 0) {
+            $solPriceCache = $price;
+            $lastSolPriceTime = $now;
+            return $price;
+        }
     }
     
     // Fallback to Dexscreener
-    return getTokenPrice("So11111111111111111111111111111111111111112");
+    $price = getTokenPrice("So11111111111111111111111111111111111111112");
+    if ($price > 0) {
+        $solPriceCache = $price;
+        $lastSolPriceTime = $now;
+    }
+    
+    return $price;
 }
 
 // Log wallet activity to a file
@@ -391,13 +456,17 @@ function updateLeaderboard() {
     
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
+    $solPriceUsd = getSolPriceUsd();
+    $winnerPotUsd = $winnerPotBalance * $solPriceUsd;
     
     $result = [
         'updated' => date('Y-m-d H:i:s'), // German time
         'data' => $leaderboard,
         'winner_pot' => [
             'wallet' => $WINNER_POT_WALLET,
-            'balance' => round($winnerPotBalance, 4)
+            'balance' => round($winnerPotBalance, 4),
+            'balance_usd' => round($winnerPotUsd, 2), // Add USD value
+            'sol_price_usd' => round($solPriceUsd, 2) // Add current SOL price
         ],
         'challenge_ended' => $challengeEnded,
         'challenge_end_date' => $CHALLENGE_END_DATE,
