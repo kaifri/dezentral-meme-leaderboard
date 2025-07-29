@@ -1,61 +1,61 @@
 {
-  "updated": "2025-07-29T07:47:29.454493+00:00",
+  "updated": "2025-07-29T07:55:52.957952+00:00",
   "data": [
     {
       "username": "LaVleR",
       "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
       "sol": 0.1357,
-      "tokens": 0.816,
-      "total": 0.9517,
-      "change_pct": 95.5
+      "tokens": 0.8175,
+      "total": 0.9531,
+      "change_pct": 95.8
     },
     {
       "username": "Umut",
       "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
       "sol": 0.2177,
-      "tokens": 0.5808,
-      "total": 0.7984,
-      "change_pct": 59.69
-    },
-    {
-      "username": "Wozzelsepp",
-      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
-      "sol": 0.1496,
-      "tokens": 0.4485,
-      "total": 0.598,
-      "change_pct": 19.61
+      "tokens": 0.531,
+      "total": 0.7487,
+      "change_pct": 49.74
     },
     {
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.519,
-      "total": 0.5614,
-      "change_pct": 11.06
+      "tokens": 0.5199,
+      "total": 0.5623,
+      "change_pct": 11.24
+    },
+    {
+      "username": "Wozzelsepp",
+      "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
+      "sol": 0.1496,
+      "tokens": 0.4068,
+      "total": 0.5564,
+      "change_pct": 11.28
     },
     {
       "username": "hir0",
       "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
       "sol": 0.3861,
-      "tokens": 0.0708,
-      "total": 0.4568,
-      "change_pct": -8.63
+      "tokens": 0.0626,
+      "total": 0.4487,
+      "change_pct": -10.27
     },
     {
       "username": "BeardedViking",
       "wallet": "4rrZdr2pG9mM4euarUGbPCbKcgnoRasDN7zigXBxEAiD",
       "sol": 0.1217,
-      "tokens": 0.146,
-      "total": 0.2676,
-      "change_pct": -46.47
+      "tokens": 0.1449,
+      "total": 0.2666,
+      "change_pct": -46.68
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
       "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
       "sol": 0.0204,
-      "tokens": 0.0433,
-      "total": 0.0638,
-      "change_pct": -87.24
+      "tokens": 0.0434,
+      "total": 0.0639,
+      "change_pct": -87.23
     },
     {
       "username": "Moge G",
