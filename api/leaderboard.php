@@ -88,87 +88,141 @@ function getSolBalance($wallet) {
 
 // Get token balances with RPC primary, Helius fallback
 function getTokenBalances($wallet) {
+    error_log("🎯 Starting token balance fetch for wallet: {$wallet}");
+    
     // Try Solana RPC first (more complete)
     $tokens = getTokenBalancesRPC($wallet);
+    error_log("🔹 RPC returned " . count($tokens) . " tokens for {$wallet}");
     
     // If RPC fails, fallback to Helius
     if (empty($tokens)) {
+        error_log("⚠️ RPC returned no tokens for {$wallet}, trying Helius fallback");
         logWalletActivity($wallet, "RPC returned no tokens, trying Helius fallback");
         $tokens = getTokenBalancesHelius($wallet);
+        error_log("🔹 Helius returned " . count($tokens) . " tokens for {$wallet}");
+    }
+    
+    error_log("✅ Final token count for {$wallet}: " . count($tokens));
+    if (!empty($tokens)) {
+        foreach ($tokens as $mint => $amount) {
+            error_log("   - {$mint}: {$amount}");
+        }
     }
     
     return $tokens;
 }
 
 function getTokenBalancesRPC($wallet) {
-    // Add delay to prevent rate limiting
-    usleep(200000); // Increase to 200ms delay between RPC calls
+    error_log("🌐 Starting RPC token fetch for: {$wallet}");
     
-    $data = [
-        'jsonrpc' => '2.0',
-        'id' => 1,
-        'method' => 'getTokenAccountsByOwner',
-        'params' => [
-            $wallet, 
-            ['programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'],
-            ['encoding' => 'jsonParsed']
-        ]
+    // Validate wallet address first
+    if (strlen($wallet) !== 44) {
+        error_log("❌ Invalid wallet address length for {$wallet}: " . strlen($wallet) . " characters");
+        return [];
+    }
+    
+    // List of RPC endpoints to try
+    $rpcEndpoints = [
+        'https://api.mainnet-beta.solana.com',
+        'https://rpc.ankr.com/solana',
+        'https://solana-mainnet.g.alchemy.com/v2/demo'
     ];
     
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => 'Content-Type: application/json',
-            'content' => json_encode($data),
-            'timeout' => 10 // Add timeout
-        ]
-    ]);
-    
-    logWalletActivity($wallet, "Fetching token balances from Solana RPC");
-    
-    // Use @ to suppress warnings that break JSON output
-    $response = @file_get_contents('https://api.mainnet-beta.solana.com', false, $context);
-    
-    if ($response === false) {
-        logWalletActivity($wallet, "ERROR: Failed to fetch from Solana RPC");
-        return [];
-    }
-    
-    $result = json_decode($response, true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        logWalletActivity($wallet, "JSON decode error: " . json_last_error_msg());
-        return [];
-    }
-    
     $tokens = [];
-    if (isset($result['result']['value']) && is_array($result['result']['value'])) {
-        logWalletActivity($wallet, "Found " . count($result['result']['value']) . " token accounts from RPC");
+    
+    foreach ($rpcEndpoints as $index => $endpoint) {
+        error_log("🔄 Trying RPC endpoint " . ($index + 1) . ": {$endpoint}");
         
-        foreach ($result['result']['value'] as $account) {
-            if (!isset($account['account']['data']['parsed']['info'])) {
-                continue;
-            }
-            
-            $accountData = $account['account']['data']['parsed']['info'];
-            $mint = $accountData['mint'] ?? '';
-            $tokenAmount = $accountData['tokenAmount'] ?? [];
-            $amount = floatval($tokenAmount['uiAmount'] ?? 0);
-            
-            if ($mint && $amount > 0) {
-                logWalletActivity($wallet, "RPC Token {$mint}: amount={$amount}");
-                $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
-                logWalletActivity($wallet, "Added RPC token {$mint} with amount {$amount}");
-            }
+        // Add delay to prevent rate limiting
+        if ($index > 0) usleep(500000); // 500ms delay for fallback endpoints
+        
+        // Correct RPC request structure
+        $requestData = [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'getTokenAccountsByOwner',
+            'params' => [
+                $wallet,
+                [
+                    'programId' => 'TokenkegQfeZyiNwAJbNbGKPfvXJ4bKbPDPqbL6tLZvg'
+                ],
+                [
+                    'encoding' => 'jsonParsed'
+                ]
+            ]
+        ];
+        
+        error_log("📡 Request payload: " . json_encode($requestData));
+        
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => [
+                    'Content-Type: application/json',
+                    'User-Agent: Mozilla/5.0 (compatible; LeaderboardBot/1.0)'
+                ],
+                'content' => json_encode($requestData),
+                'timeout' => 15,
+                'ignore_errors' => true
+            ]
+        ]);
+        
+        $response = @file_get_contents($endpoint, false, $context);
+        
+        if ($response === false) {
+            error_log("❌ RPC endpoint {$endpoint} failed for: {$wallet}");
+            continue;
         }
-    } else {
-        logWalletActivity($wallet, "No token accounts found in RPC response");
+        
+        error_log("📨 Response from {$endpoint}: " . substr($response, 0, 200) . "...");
+        
+        $result = json_decode($response, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("🚫 JSON decode error from {$endpoint} for {$wallet}: " . json_last_error_msg());
+            continue;
+        }
+        
+        // Check for RPC error
         if (isset($result['error'])) {
-            logWalletActivity($wallet, "RPC error: " . json_encode($result['error']));
+            error_log("🚨 RPC error from {$endpoint} for {$wallet}: " . json_encode($result['error']));
+            continue;
+        }
+        
+        // Success! Process the tokens
+        if (isset($result['result']['value']) && is_array($result['result']['value'])) {
+            $accountCount = count($result['result']['value']);
+            error_log("✅ Successfully got {$accountCount} token accounts from {$endpoint} for: {$wallet}");
+            
+            foreach ($result['result']['value'] as $account) {
+                if (!isset($account['account']['data']['parsed']['info'])) {
+                    error_log("⚠️ Account missing parsed info, skipping");
+                    continue;
+                }
+                
+                $accountData = $account['account']['data']['parsed']['info'];
+                $mint = $accountData['mint'] ?? '';
+                $tokenAmount = $accountData['tokenAmount'] ?? [];
+                $amount = floatval($tokenAmount['uiAmount'] ?? 0);
+                
+                error_log("🔍 Found token account: mint={$mint}, amount={$amount}");
+                
+                if ($mint && $amount > 0) {
+                    error_log("✅ Valid token for {$wallet}: {$mint} = {$amount}");
+                    $tokens[$mint] = ($tokens[$mint] ?? 0) + $amount;
+                } else {
+                    error_log("⚠️ Skipping: mint={$mint}, amount={$amount}");
+                }
+            }
+            
+            // Break out of loop if we got a successful response
+            break;
+        } else {
+            error_log("❌ No token accounts in response from {$endpoint}");
         }
     }
     
-    logWalletActivity($wallet, "Final RPC token count: " . count($tokens));
+    error_log("🏁 Final RPC token count for {$wallet}: " . count($tokens));
     return $tokens;
 }
 
