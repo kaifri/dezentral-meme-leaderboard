@@ -54,7 +54,40 @@ $frontend_config = [
       🟢 Challenge läuft bis <span id="end-date" class="font-bold block sm:inline"></span>
     </div>
     <div id="challenge-ended" class="bg-gradient-to-r from-red-800 to-red-700 text-red-200 rounded-lg px-2 sm:px-4 py-2 hidden text-xs sm:text-sm">
-      🔴 Challenge beendet! Finale Ergebnisse
+      🔴 Challenge beendet! Finale Wertung nach SOL-Balance
+    </div>
+  </div>
+
+  <!-- Contest Rules -->
+  <div class="mb-6 w-full max-w-4xl">
+    <div class="bg-gradient-to-r from-blue-900/30 via-purple-900/30 to-blue-900/30 border border-blue-700/50 rounded-xl p-4 sm:p-6">
+      <h2 class="text-lg sm:text-xl font-bold text-blue-300 mb-3 text-center">📋 Contest Regeln</h2>
+      <div class="grid md:grid-cols-2 gap-4 text-sm">
+        <div>
+          <h3 class="text-blue-400 font-semibold mb-2">⏰ Zeitraum</h3>
+          <p class="text-gray-300">Start: Montag 28.01. 0:00<br>Ende: Sonntag 03.08. 24:00</p>
+          
+          <h3 class="text-blue-400 font-semibold mb-2 mt-4">💰 Teilnahme</h3>
+          <p class="text-gray-300">0,5 SOL Startkapital<br>0,5 SOL Winner Pot Beitrag</p>
+          
+          <h3 class="text-blue-400 font-semibold mb-2 mt-4">🏆 Gewinner</h3>
+          <p class="text-gray-300">Höchste <strong>SOL-Balance</strong> zum Endzeitpunkt gewinnt</p>
+        </div>
+        <div>
+          <h3 class="text-blue-400 font-semibold mb-2">✅ Erlaubt</h3>
+          <ul class="text-gray-300 space-y-1">
+            <li>• Gleiche Coins wie andere kaufen</li>
+            <li>• Reload bei &lt;0.05 SOL möglich</li>
+            <li>• Teilnahme bis 24h nach Start</li>
+          </ul>
+          
+          <h3 class="text-red-400 font-semibold mb-2 mt-4">❌ Verboten</h3>
+          <ul class="text-gray-300 space-y-1">
+            <li>• Copy Trading der Wallets</li>
+            <li>• Manipulation</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -72,6 +105,16 @@ $frontend_config = [
 
   <p class="mb-4 sm:mb-6 text-xs sm:text-sm text-gray-400">🕒 Update: <span id="last-updated">...</span></p>
   
+  <!-- Ranking Mode Info -->
+  <div id="ranking-info" class="mb-4 px-4 py-2 rounded-lg text-center text-xs sm:text-sm hidden">
+    <div id="live-ranking" class="bg-yellow-900/30 border border-yellow-600 text-yellow-200 rounded hidden">
+      📊 Live Ranking: SOL + Token Werte
+    </div>
+    <div id="final-ranking" class="bg-red-900/30 border border-red-600 text-red-200 rounded hidden">
+      🏁 Finale Wertung: Nur SOL-Balance zählt!
+    </div>
+  </div>
+  
   <!-- Desktop Table View -->
   <div class="hidden md:block w-full max-w-6xl overflow-x-auto">
     <table class="min-w-full bg-gray-800 shadow-2xl rounded-xl overflow-hidden">
@@ -82,7 +125,7 @@ $frontend_config = [
           <th class="px-6 py-4 font-bold text-yellow-900">Wallet</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">SOL</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">Tokens</th>
-          <th class="px-6 py-4 text-right font-bold text-yellow-900">Total (SOL)</th>
+          <th class="px-6 py-4 text-right font-bold text-yellow-900" id="total-header">Total (SOL)</th>
           <th class="px-6 py-4 text-right font-bold text-yellow-900">% Change</th>
         </tr>
       </thead>
@@ -99,7 +142,7 @@ $frontend_config = [
   <div id="winner-announcement" class="mt-6 sm:mt-8 bg-gradient-to-r from-yellow-700 via-orange-600 to-yellow-700 px-4 sm:px-8 py-4 sm:py-6 rounded-xl text-center shadow-2xl winner-glow hidden w-full max-w-md">
     <div class="text-xl sm:text-3xl mb-2 sm:mb-3">🎉 Herzlichen Glückwunsch! 🎉</div>
     <div class="text-lg sm:text-2xl text-yellow-200 mb-2 sm:mb-3">Gewinner: <span id="winner-name" class="font-bold gradient-text"></span></div>
-    <div class="text-base sm:text-xl">Endstand: <span id="winner-total" class="font-bold text-yellow-100"></span> SOL</div>
+    <div class="text-base sm:text-xl">Finale SOL-Balance: <span id="winner-total" class="font-bold text-yellow-100"></span> SOL</div>
     <div class="text-sm sm:text-lg text-yellow-200 mt-2">Gewinn: <span id="winner-change" class="font-bold"></span>%</div>
   </div>
 
@@ -143,9 +186,13 @@ $frontend_config = [
       }
     }
 
-    function createMobileCard(entry, rank, challengeEnded) {
+    function createMobileCard(entry, rank, challengeEnded, finalRanking) {
       const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
       const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+      
+      // Use SOL balance for final ranking
+      const displayTotal = finalRanking ? entry.sol : entry.total;
+      const totalLabel = finalRanking ? 'SOL' : 'Total SOL';
       
       let cardClass = "bg-gray-800 rounded-lg p-4 shadow-lg";
       let rankDisplay = getRankEmoji(rank);
@@ -172,7 +219,7 @@ $frontend_config = [
               </div>
             </div>
             <div class="text-right">
-              <div class="font-bold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-yellow-400' : 'text-yellow-400'}">${entry.total.toFixed(4)} SOL</div>
+              <div class="font-bold ${rank === 1 ? 'text-yellow-200 text-lg' : rank <= 3 ? 'text-yellow-400' : 'text-yellow-400'}">${displayTotal.toFixed(4)} ${finalRanking ? 'SOL' : 'SOL'}</div>
               <div class="text-xs ${changeColor} font-mono">${changeText} ${entry.change_pct.toFixed(2)}%</div>
             </div>
           </div>
@@ -186,12 +233,12 @@ $frontend_config = [
               <span class="font-mono ml-1 text-green-400">${entry.tokens.toFixed(4)}</span>
             </div>
           </div>
+          ${finalRanking ? '<div class="mt-2 text-xs text-red-300 text-center">🏁 Finale Wertung: Nur SOL zählt!</div>' : ''}
         </div>
       `;
     }
 
     function updateLeaderboard() {
-      // No Authorization header needed for GET requests
       fetch(`${CONFIG.api_base_url}/leaderboard.php`, {
         method: 'GET',
         headers: {
@@ -212,15 +259,11 @@ $frontend_config = [
           const challengeActive = document.getElementById("challenge-active");
           const challengeEnded = document.getElementById("challenge-ended");
           const endDate = document.getElementById("end-date");
-          const winnerPot = document.getElementById("winner-pot");
-          const potBalance = document.getElementById("pot-balance");
-          const potWallet = document.getElementById("pot-wallet");
-          const potWalletLink = document.getElementById("pot-wallet-link");
-          const winnerAnnouncement = document.getElementById("winner-announcement");
-          const winnerName = document.getElementById("winner-name");
-          const winnerTotal = document.getElementById("winner-total");
-          const winnerChange = document.getElementById("winner-change");
-
+          const rankingInfo = document.getElementById("ranking-info");
+          const liveRanking = document.getElementById("live-ranking");
+          const finalRanking = document.getElementById("final-ranking");
+          const totalHeader = document.getElementById("total-header");
+          
           // Update "updated x minutes ago"
           updated.textContent = getTimeAgo(json.updated);
           updated.dataset.lastUpdate = json.updated;
@@ -264,11 +307,27 @@ $frontend_config = [
             winnerChange.textContent = winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2);
           }
 
+          // Update ranking mode display
+          const isFinalRanking = json.final_ranking_by_sol_only || false;
+          rankingInfo.classList.remove("hidden");
+          if (isFinalRanking) {
+            liveRanking.classList.add("hidden");
+            finalRanking.classList.remove("hidden");
+            totalHeader.textContent = "SOL Balance";
+          } else {
+            liveRanking.classList.remove("hidden");
+            finalRanking.classList.add("hidden");
+            totalHeader.textContent = "Total (SOL)";
+          }
+
           // Generate both desktop table and mobile cards
           json.data.forEach((entry, i) => {
             const rank = i + 1;
             const changeColor = entry.change_pct > 0 ? 'text-green-400' : (entry.change_pct < 0 ? 'text-red-400' : 'text-gray-300');
             const changeText = entry.change_pct > 0 ? '▲' : (entry.change_pct < 0 ? '▼' : '–');
+            
+            // Use SOL balance for final ranking, total for normal ranking
+            const displayTotal = isFinalRanking ? entry.sol : entry.total;
             
             // Desktop table row
             let rowClass = "hover:bg-gray-700 transition-colors";
@@ -297,13 +356,15 @@ $frontend_config = [
               </td>
               <td class="px-6 py-4 text-right font-mono">${entry.sol.toFixed(4)}</td>
               <td class="px-6 py-4 text-right text-green-400 font-mono">${entry.tokens.toFixed(4)}</td>
-              <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">${entry.total.toFixed(4)}</td>
+              <td class="px-6 py-4 text-right font-bold ${rank === 1 ? 'text-yellow-200 text-xl' : rank <= 3 ? 'text-yellow-400 text-lg' : 'text-yellow-400'} font-mono">
+                ${displayTotal.toFixed(4)}${isFinalRanking ? '<span class="text-xs text-red-300 block">🏁 SOL only</span>' : ''}
+              </td>
               <td class="px-6 py-4 text-right font-mono ${changeColor} ${rank <= 3 ? 'font-bold' : ''}">${changeText} ${entry.change_pct.toFixed(2)}%</td>
             `;
             tbody.appendChild(row);
 
             // Mobile card
-            mobileContainer.innerHTML += createMobileCard(entry, rank, json.challenge_ended);
+            mobileContainer.innerHTML += createMobileCard(entry, rank, json.challenge_ended, isFinalRanking);
           });
         })
         .catch(err => {

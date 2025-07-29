@@ -339,6 +339,11 @@ function updateLeaderboard() {
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
     
+    // Check if challenge ended
+    $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
+    $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
+    $challengeEnded = $nowDateTime >= $endDateTime;
+    
     foreach ($wallets as $entry) {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
@@ -368,19 +373,21 @@ function updateLeaderboard() {
             'sol' => round($sol, 4),
             'tokens' => round($tokenValue, 4),
             'total' => round($total, 4),
-            'change_pct' => round($changePct, 2)
+            'change_pct' => round($changePct, 2),
+            'sol_only' => round($sol, 4) // For final ranking when challenge ends
         ];
     }
     
-    // Sort leaderboard
-    usort($leaderboard, function($a, $b) {
-        return $b['total'] <=> $a['total'];
-    });
-    
-    // Check if challenge ended
-    $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
-    $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
-    $challengeEnded = $nowDateTime >= $endDateTime;
+    // Sort leaderboard - if challenge ended, sort by SOL only, otherwise by total
+    if ($challengeEnded) {
+        usort($leaderboard, function($a, $b) {
+            return $b['sol_only'] <=> $a['sol_only'];
+        });
+    } else {
+        usort($leaderboard, function($a, $b) {
+            return $b['total'] <=> $a['total'];
+        });
+    }
     
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
@@ -393,7 +400,8 @@ function updateLeaderboard() {
             'balance' => round($winnerPotBalance, 4)
         ],
         'challenge_ended' => $challengeEnded,
-        'challenge_end_date' => $CHALLENGE_END_DATE
+        'challenge_end_date' => $CHALLENGE_END_DATE,
+        'final_ranking_by_sol_only' => $challengeEnded
     ];
     
     // Safe atomic write
