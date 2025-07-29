@@ -77,7 +77,7 @@ $frontend_config = [
           <h3 class="text-blue-400 font-semibold mb-2">✅ Erlaubt</h3>
           <ul class="text-gray-300 space-y-1">
             <li>• Gleiche Coins wie andere kaufen</li>
-            <li>• Reload bei &lt;0.05 SOL möglich</li>
+            <li>• Reload von 1x max 0.5 SOL bei &lt;0.05 SOL möglich</li>
             <li>• Teilnahme bis 24h nach Start</li>
           </ul>
           
