@@ -1,53 +1,45 @@
 {
-  "updated": "2025-07-29T11:52:58.117774+00:00",
+  "updated": "2025-07-29T12:00:15.031996+00:00",
   "data": [
-    {
-      "username": "LaVleR",
-      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
-      "sol": 0.1357,
-      "tokens": 0.8351,
-      "total": 0.9708,
-      "change_pct": 99.43
-    },
     {
       "username": "Umut",
       "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
       "sol": 0.2177,
-      "tokens": 0.6977,
-      "total": 0.9153,
-      "change_pct": 83.07
+      "tokens": 0.7052,
+      "total": 0.9229,
+      "change_pct": 84.57
     },
     {
       "username": "Wozzelsepp",
       "wallet": "C9JwJKznFipgQDHEw2PNoj1v7GrMAsTfXdic7s4dpkLe",
       "sol": 0.1496,
-      "tokens": 0.559,
-      "total": 0.7085,
-      "change_pct": 41.71
+      "tokens": 0.5624,
+      "total": 0.712,
+      "change_pct": 42.4
     },
     {
       "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
       "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
       "sol": 0.0095,
-      "tokens": 0.5897,
-      "total": 0.5992,
-      "change_pct": 19.83
+      "tokens": 0.5916,
+      "total": 0.6012,
+      "change_pct": 20.23
     },
     {
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0424,
-      "tokens": 0.5104,
-      "total": 0.5528,
-      "change_pct": 9.35
+      "tokens": 0.5106,
+      "total": 0.553,
+      "change_pct": 9.39
     },
     {
       "username": "hir0",
       "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
       "sol": 0.0733,
-      "tokens": 0.2833,
-      "total": 0.3567,
-      "change_pct": -28.67
+      "tokens": 0.2897,
+      "total": 0.363,
+      "change_pct": -27.4
     },
     {
       "username": "BeardedViking",
@@ -56,6 +48,14 @@
       "tokens": 0,
       "total": 0.2992,
       "change_pct": -40.16
+    },
+    {
+      "username": "LaVleR",
+      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
+      "sol": 0.1331,
+      "tokens": 0,
+      "total": 0.1331,
+      "change_pct": -72.65
     },
     {
       "username": "Moge G",
