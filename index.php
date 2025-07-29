@@ -65,7 +65,7 @@ $frontend_config = [
       <div class="grid md:grid-cols-2 gap-4 text-sm">
         <div>
           <h3 class="text-blue-400 font-semibold mb-2">⏰ Zeitraum</h3>
-          <p class="text-gray-300">Start: Montag 28.01. 0:00<br>Ende: Sonntag 03.08. 24:00</p>
+          <p class="text-gray-300">Start: Montag 28.07. 0:00<br>Ende: Sonntag 03.08. 24:00</p>
           
           <h3 class="text-blue-400 font-semibold mb-2 mt-4">💰 Teilnahme</h3>
           <p class="text-gray-300">0,5 SOL Startkapital<br>0,5 SOL Winner Pot Beitrag</p>
@@ -264,6 +264,16 @@ $frontend_config = [
           const finalRanking = document.getElementById("final-ranking");
           const totalHeader = document.getElementById("total-header");
           
+        
+          const winnerPot = document.getElementById("winner-pot");
+          const potBalance = document.getElementById("pot-balance");
+          const potWallet = document.getElementById("pot-wallet");
+          const potWalletLink = document.getElementById("pot-wallet-link");
+          const winnerAnnouncement = document.getElementById("winner-announcement");
+          const winnerName = document.getElementById("winner-name");
+          const winnerTotal = document.getElementById("winner-total");
+          const winnerChange = document.getElementById("winner-change");
+          
           // Update "updated x minutes ago"
           updated.textContent = getTimeAgo(json.updated);
           updated.dataset.lastUpdate = json.updated;
@@ -303,7 +313,8 @@ $frontend_config = [
             const winner = json.data[0];
             winnerAnnouncement.classList.remove("hidden");
             winnerName.textContent = winner.username;
-            winnerTotal.textContent = winner.total.toFixed(4);
+            // FIX: Use SOL balance for final winner display instead of total
+            winnerTotal.textContent = winner.sol.toFixed(4);
             winnerChange.textContent = winner.change_pct > 0 ? `+${winner.change_pct.toFixed(2)}` : winner.change_pct.toFixed(2);
           }
 
