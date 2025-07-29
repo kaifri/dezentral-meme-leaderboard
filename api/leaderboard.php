@@ -228,39 +228,54 @@ function getTokenPrice($mint) {
     $now = time();
     $cacheKey = $mint;
     
+    // Enhanced logging for price requests
+    error_log("🔍 Requesting price for token: {$mint}");
+    
     // Check cache first
     if (isset($priceCache[$cacheKey]) && 
         ($now - $priceCache[$cacheKey]['timestamp']) < $cacheLifetime) {
+        error_log("💾 Using cached price for {$mint}: {$priceCache[$cacheKey]['price']}");
         return $priceCache[$cacheKey]['price'];
     }
     
     // Rate limiting - wait between requests
     $timeSinceLastRequest = microtime(true) - $lastRequestTime;
     if ($timeSinceLastRequest < ($rateLimitDelay / 1000000)) {
-        usleep($rateLimitDelay - ($timeSinceLastRequest * 1000000));
+        $sleepTime = $rateLimitDelay - ($timeSinceLastRequest * 1000000);
+        error_log("⏱️ Rate limiting: sleeping for " . round($sleepTime / 1000) . "ms before requesting {$mint}");
+        usleep($sleepTime);
     }
     
     $url = "https://api.dexscreener.com/latest/dex/tokens/{$mint}";
+    error_log("🌐 Fetching from Dexscreener: {$url}");
+    
     $response = @file_get_contents($url);
     $lastRequestTime = microtime(true);
     
     $price = 0;
     if ($response === false) {
-        error_log("Failed to fetch data from Dexscreener for token: {$mint} (possible rate limit)");
+        error_log("❌ Failed to fetch data from Dexscreener for token: {$mint} (possible rate limit)");
         
         // Return cached value if available, even if expired
         if (isset($priceCache[$cacheKey])) {
-            error_log("Using expired cache for token: {$mint}");
+            error_log("🔄 Using expired cache for token: {$mint}, price: {$priceCache[$cacheKey]['price']}");
             return $priceCache[$cacheKey]['price'];
         }
+        error_log("💀 No cached data available for {$mint}, returning 0");
         return 0;
     }
     
     $data = json_decode($response, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("🚫 JSON decode error for {$mint}: " . json_last_error_msg());
+        return 0;
+    }
+    
     $pairs = $data['pairs'] ?? [];
     
     if (empty($pairs)) {
-        error_log("No trading pairs found for token: {$mint}");
+        error_log("📭 No trading pairs found for token: {$mint}");
         // Cache 0 price to avoid repeated failed requests
         $priceCache[$cacheKey] = [
             'price' => 0,
@@ -269,6 +284,8 @@ function getTokenPrice($mint) {
         return 0;
     }
     
+    error_log("📊 Found " . count($pairs) . " trading pairs for {$mint}");
+    
     // Sort by liquidity (USD value)
     usort($pairs, function($a, $b) {
         $liqA = floatval($a['liquidity']['usd'] ?? 0);
@@ -276,19 +293,33 @@ function getTokenPrice($mint) {
         return $liqB <=> $liqA;
     });
     
+    // Log top 3 pairs for debugging
+    for ($i = 0; $i < min(3, count($pairs)); $i++) {
+        $pair = $pairs[$i];
+        $liquidity = floatval($pair['liquidity']['usd'] ?? 0);
+        $priceUsd = floatval($pair['priceUsd'] ?? 0);
+        $baseToken = $pair['baseToken']['address'] ?? '';
+        $quoteToken = $pair['quoteToken']['address'] ?? '';
+        
+        error_log("💱 Pair " . ($i + 1) . " for {$mint}: base={$baseToken}, quote={$quoteToken}, priceUSD={$priceUsd}, liquidity=\${$liquidity}");
+    }
+    
     foreach ($pairs as $pair) {
         $baseToken = $pair['baseToken']['address'] ?? '';
         $quoteToken = $pair['quoteToken']['address'] ?? '';
         $priceUsd = floatval($pair['priceUsd'] ?? 0);
+        $liquidity = floatval($pair['liquidity']['usd'] ?? 0);
         
         // If our token is the base token, use priceUsd directly
         if ($baseToken === $mint && $priceUsd > 0) {
             $price = $priceUsd;
+            error_log("✅ Found price for {$mint} as base token: \${$priceUsd} (liquidity: \${$liquidity})");
             break;
         }
         // If our token is the quote token, invert the price
         elseif ($quoteToken === $mint && $priceUsd > 0) {
             $price = 1 / $priceUsd;
+            error_log("✅ Found price for {$mint} as quote token: \${$price} (inverted from \${$priceUsd}, liquidity: \${$liquidity})");
             break;
         }
     }
@@ -300,7 +331,9 @@ function getTokenPrice($mint) {
     ];
     
     if ($price === 0) {
-        error_log("No valid price found for token: {$mint}");
+        error_log("💔 No valid price found for token: {$mint}");
+    } else {
+        error_log("💰 Final price for {$mint}: \${$price}");
     }
     
     return $price;
@@ -316,11 +349,16 @@ function getSolPriceUsd() {
     
     // Check cache
     if ($solPriceCache !== null && ($now - $lastSolPriceTime) < $cacheLifetime) {
+        error_log("💾 Using cached SOL price: \${$solPriceCache}");
         return $solPriceCache;
     }
     
+    error_log("🔍 Fetching fresh SOL price...");
+    
     // Try Jupiter first
     $url = "https://api.jup.ag/v4/price?ids=So11111111111111111111111111111111111111112&vsToken=USDC";
+    error_log("🌐 Trying Jupiter API: {$url}");
+    
     $response = @file_get_contents($url);
     
     if ($response !== false) {
@@ -329,15 +367,24 @@ function getSolPriceUsd() {
         if ($price > 0) {
             $solPriceCache = $price;
             $lastSolPriceTime = $now;
+            error_log("✅ SOL price from Jupiter: \${$price}");
             return $price;
+        } else {
+            error_log("⚠️ Jupiter returned invalid price: " . json_encode($data));
         }
+    } else {
+        error_log("❌ Failed to fetch SOL price from Jupiter");
     }
     
     // Fallback to Dexscreener
+    error_log("🔄 Falling back to Dexscreener for SOL price...");
     $price = getTokenPrice("So11111111111111111111111111111111111111112");
     if ($price > 0) {
         $solPriceCache = $price;
         $lastSolPriceTime = $now;
+        error_log("✅ SOL price from Dexscreener: \${$price}");
+    } else {
+        error_log("💀 Failed to get SOL price from Dexscreener");
     }
     
     return $price;
@@ -404,33 +451,58 @@ function updateLeaderboard() {
     $leaderboard = [];
     $solPriceUsd = getSolPriceUsd();
     
+    error_log("🚀 Starting leaderboard update with SOL price: \${$solPriceUsd}");
+    
     // Check if challenge ended
     $endDateTime = new DateTime($CHALLENGE_END_DATE, new DateTimeZone('UTC'));
     $nowDateTime = new DateTime('now', new DateTimeZone('UTC'));
     $challengeEnded = $nowDateTime >= $endDateTime;
     
+    error_log("⏰ Challenge status: " . ($challengeEnded ? 'ENDED' : 'ACTIVE') . " (End: {$CHALLENGE_END_DATE})");
+    
     foreach ($wallets as $entry) {
         $wallet = $entry['wallet'];
         $username = $entry['username'] ?? substr($wallet, 0, 6);
         
+        error_log("👤 Processing wallet: {$username} ({$wallet})");
+        
         // Get SOL balance
         $sol = getSolBalance($wallet);
+        error_log("💰 SOL balance for {$username}: {$sol} SOL");
         
         // Get token balances
         $tokens = getTokenBalances($wallet);
+        error_log("🎯 Found " . count($tokens) . " token types for {$username}");
         
-        // Calculate token value
+        // Calculate token value with detailed logging
         $tokenValue = 0;
+        $tokenCount = 0;
         foreach ($tokens as $mint => $amount) {
+            $tokenCount++;
+            error_log("🔹 Processing token {$tokenCount} for {$username}: {$mint} (amount: {$amount})");
+            
             $tokenPriceUsd = getTokenPrice($mint);
+            
             if ($tokenPriceUsd > 0 && $solPriceUsd > 0) {
-                $tokenValue += $amount * ($tokenPriceUsd / $solPriceUsd);
+                $tokenValueInSol = $amount * ($tokenPriceUsd / $solPriceUsd);
+                $tokenValue += $tokenValueInSol;
+                
+                error_log("💎 Token value calculated: {$amount} × (\${$tokenPriceUsd} / \${$solPriceUsd}) = {$tokenValueInSol} SOL");
+                
+                // Use the enhanced logging function from cron/update.php if available
+                if (function_exists('logTokenPricing')) {
+                    logTokenPricing($wallet, $mint, $amount, $tokenPriceUsd, $solPriceUsd, $tokenValueInSol);
+                }
+            } else {
+                error_log("⚠️ Skipping token {$mint} for {$username}: tokenPrice=\${$tokenPriceUsd}, solPrice=\${$solPriceUsd}");
             }
         }
         
         $total = $sol + $tokenValue;
         $start = $startSols[$wallet] ?? 0;
         $changePct = $start > 0 ? (($total - $start) / $start * 100) : 0;
+        
+        error_log("📊 Summary for {$username}: SOL={$sol}, Tokens={$tokenValue}, Total={$total}, Start={$start}, Change={$changePct}%");
         
         $leaderboard[] = [
             'username' => $username,
@@ -445,19 +517,30 @@ function updateLeaderboard() {
     
     // Sort leaderboard - if challenge ended, sort by SOL only, otherwise by total
     if ($challengeEnded) {
+        error_log("🏁 Sorting by SOL balance only (challenge ended)");
         usort($leaderboard, function($a, $b) {
             return $b['sol_only'] <=> $a['sol_only'];
         });
     } else {
+        error_log("📈 Sorting by total value (challenge active)");
         usort($leaderboard, function($a, $b) {
             return $b['total'] <=> $a['total'];
         });
     }
     
+    // Log final ranking
+    error_log("🏆 Final leaderboard order:");
+    foreach ($leaderboard as $i => $entry) {
+        $rank = $i + 1;
+        $sortValue = $challengeEnded ? $entry['sol_only'] : $entry['total'];
+        error_log("   {$rank}. {$entry['username']}: {$sortValue} SOL");
+    }
+    
     // Get winner pot balance
     $winnerPotBalance = getSolBalance($WINNER_POT_WALLET);
-    $solPriceUsd = getSolPriceUsd();
     $winnerPotUsd = $winnerPotBalance * $solPriceUsd;
+    
+    error_log("💰 Winner pot: {$winnerPotBalance} SOL (~\${$winnerPotUsd})");
     
     $result = [
         'updated' => date('Y-m-d H:i:s'), // German time
@@ -475,9 +558,9 @@ function updateLeaderboard() {
     
     // Safe atomic write
     if (safeWriteJsonFile($DATA_FILE, $result)) {
-        error_log("Leaderboard updated successfully at " . date('Y-m-d H:i:s'));
+        error_log("✅ Leaderboard file written successfully at " . date('Y-m-d H:i:s'));
     } else {
-        error_log("Failed to update leaderboard file");
+        error_log("❌ Failed to write leaderboard file");
     }
     
     return $result;

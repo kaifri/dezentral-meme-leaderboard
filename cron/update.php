@@ -18,6 +18,20 @@ function logMessage($message, $level = 'INFO') {
     echo $logEntry;
 }
 
+// Enhanced logging function for token price debugging
+function logTokenPricing($wallet, $tokenMint, $amount, $priceUsd, $solPriceUsd, $tokenValueInSol) {
+    $message = sprintf(
+        "Token pricing for wallet %s: mint=%s, amount=%.8f, priceUSD=%.8f, solPriceUSD=%.4f, tokenValueSOL=%.8f",
+        substr($wallet, 0, 8) . '...',
+        $tokenMint,
+        $amount,
+        $priceUsd,
+        $solPriceUsd,
+        $tokenValueInSol
+    );
+    logMessage($message, 'PRICE');
+}
+
 // Create lock file path
 $lockFile = __DIR__ . '/../data/update.lock';
 
@@ -95,6 +109,10 @@ try {
     // Measure execution time
     $startTime = microtime(true);
     
+    // Log SOL price at start
+    $solPriceUsd = getSolPriceUsd();
+    logMessage("Current SOL price: $" . number_format($solPriceUsd, 4), 'PRICE');
+    
     // Call the update function
     $data = updateLeaderboard();
     
@@ -107,6 +125,20 @@ try {
     logMessage("✅ Update completed successfully", 'SUCCESS');
     logMessage("📊 Processed {$walletCount} wallets in {$executionTime}ms", 'INFO');
     logMessage("💰 Winner pot balance: {$winnerPotBalance} SOL", 'INFO');
+    
+    // Log summary of token values processed
+    $totalTokenValue = 0;
+    $totalSolValue = 0;
+    $tokensProcessed = 0;
+    
+    foreach ($data['data'] as $entry) {
+        $totalTokenValue += $entry['tokens'];
+        $totalSolValue += $entry['sol'];
+        if ($entry['tokens'] > 0) $tokensProcessed++;
+    }
+    
+    logMessage("💎 Token summary: {$tokensProcessed} wallets with tokens, total token value: " . number_format($totalTokenValue, 4) . " SOL", 'SUMMARY');
+    logMessage("💰 SOL summary: total SOL across all wallets: " . number_format($totalSolValue, 4) . " SOL", 'SUMMARY');
     
 } catch (Exception $e) {
     logMessage("❌ Update failed with exception: " . $e->getMessage(), 'ERROR');
