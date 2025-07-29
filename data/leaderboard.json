@@ -1,6 +1,14 @@
 {
-  "updated": "2025-07-29T14:54:30.071508+00:00",
+  "updated": "2025-07-29T15:14:40.131016+00:00",
   "data": [
+    {
+      "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
+      "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
+      "sol": 0.4171,
+      "tokens": 0,
+      "total": 0.4171,
+      "change_pct": -16.57
+    },
     {
       "username": "Umut",
       "wallet": "GKDFosW8g7cWcrXD7utu8ZAuKAkdufaDAGiejq6tc4gw",
@@ -56,14 +64,6 @@
       "tokens": 0,
       "total": 0.0183,
       "change_pct": -96.39
-    },
-    {
-      "username": "\ud835\udd4b\ud835\udd5a\ud835\udd5e\ud835\udd56\u2124",
-      "wallet": "GdF8LLFYRUKBdx1WABJSAhofVDiipxr1L3nqaTW1Qr9Z",
-      "sol": 0.0061,
-      "tokens": 0,
-      "total": 0.0061,
-      "change_pct": -98.78
     }
   ],
   "winner_pot": {
