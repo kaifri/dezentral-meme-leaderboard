@@ -1,14 +1,6 @@
 {
-  "updated": "2025-07-30T06:42:02.543805+00:00",
+  "updated": "2025-07-30T07:02:34.935392+00:00",
   "data": [
-    {
-      "username": "hir0",
-      "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
-      "sol": 0.5206,
-      "tokens": 0,
-      "total": 0.5206,
-      "change_pct": 4.12
-    },
     {
       "username": "Moge G",
       "wallet": "2r6rkq4Vkyj3o2LsCmYGTdxKNFerhpQCWHFvaxY4x7KE",
@@ -16,6 +8,14 @@
       "tokens": 0,
       "total": 0.4876,
       "change_pct": -2.47
+    },
+    {
+      "username": "hir0",
+      "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
+      "sol": 0.3145,
+      "tokens": 0,
+      "total": 0.3145,
+      "change_pct": -37.09
     },
     {
       "username": "LaVleR",
