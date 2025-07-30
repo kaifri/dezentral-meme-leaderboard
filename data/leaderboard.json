@@ -1,5 +1,5 @@
 {
-  "updated": "2025-07-30T07:57:32.237374+00:00",
+  "updated": "2025-07-30T08:27:24.676613+00:00",
   "data": [
     {
       "username": "Moge G",
@@ -12,10 +12,10 @@
     {
       "username": "hir0",
       "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
-      "sol": 0.1981,
+      "sol": 0.4017,
       "tokens": 0,
-      "total": 0.1981,
-      "change_pct": -60.38
+      "total": 0.4017,
+      "change_pct": -19.67
     },
     {
       "username": "LaVleR",
