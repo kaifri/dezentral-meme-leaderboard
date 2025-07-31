@@ -1,5 +1,5 @@
 {
-  "updated": "2025-07-31T11:53:24.030397+00:00",
+  "updated": "2025-07-31T12:15:37.547940+00:00",
   "data": [
     {
       "username": "Wozzelsepp",
@@ -10,20 +10,20 @@
       "change_pct": 345.84
     },
     {
-      "username": "hir0",
-      "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
-      "sol": 0.9916,
-      "tokens": 0,
-      "total": 0.9916,
-      "change_pct": 98.32
-    },
-    {
       "username": "Moge G",
       "wallet": "2r6rkq4Vkyj3o2LsCmYGTdxKNFerhpQCWHFvaxY4x7KE",
       "sol": 0.7458,
       "tokens": 0,
       "total": 0.7458,
       "change_pct": 49.19
+    },
+    {
+      "username": "hir0",
+      "wallet": "CT95LunTneNu2hY9BB3QAoScQwo9NV7ni54gyWua4XSG",
+      "sol": 0.69,
+      "tokens": 0,
+      "total": 0.69,
+      "change_pct": 38.01
     },
     {
       "username": "Umut",
@@ -50,20 +50,20 @@
       "change_pct": -90.89
     },
     {
+      "username": "LaVleR",
+      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
+      "sol": 0.0213,
+      "tokens": 0,
+      "total": 0.0213,
+      "change_pct": -95.63
+    },
+    {
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0183,
       "tokens": 0,
       "total": 0.0183,
       "change_pct": -96.39
-    },
-    {
-      "username": "LaVleR",
-      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
-      "sol": 0.0139,
-      "tokens": 0,
-      "total": 0.0139,
-      "change_pct": -97.15
     }
   ],
   "winner_pot": {
