@@ -1,5 +1,5 @@
 {
-  "updated": "2025-08-01T10:16:23.374347+00:00",
+  "updated": "2025-08-01T10:44:01.839505+00:00",
   "data": [
     {
       "username": "Wozzelsepp",
@@ -50,20 +50,20 @@
       "change_pct": -90.89
     },
     {
-      "username": "LaVleR",
-      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
-      "sol": 0.0449,
-      "tokens": 0,
-      "total": 0.0449,
-      "change_pct": -90.78
-    },
-    {
       "username": "rAmonZrdpxx",
       "wallet": "GRifaMcPvKeCMFn1S6diLff9md22i4ZcfWLQcHubot8R",
       "sol": 0.0183,
       "tokens": 0,
       "total": 0.0183,
       "change_pct": -96.39
+    },
+    {
+      "username": "LaVleR",
+      "wallet": "52FBVZYByzJVi2puqWTcTDSXKyeTaPY6qnSDRzD4LDs9",
+      "sol": 0.0,
+      "tokens": 0,
+      "total": 0.0,
+      "change_pct": -100.0
     }
   ],
   "winner_pot": {
